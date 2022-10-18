@@ -53,8 +53,8 @@ export CUDA_VISIBLE_DEVICES=0
 # pitch = no
 # prososy embedding = yes
 # RR block = yes
-python main.py  --config /mnt/data1/waris/repo/transformer-vc-prosody/conf/transformer_vc_ppg2mel_outspkdloss_inp_conct_with_rr.yaml \
-                --name=transformer-vc-rrII \
+python main.py  --config /mnt/data1/waris/repo/transformer-prosody-vc/conf/transformer_vc_ppg2mel_outspkdloss_inp_conct_with_rr.yaml \
+                --name=transformer-vc-rrIII \
                 --seed=2 \
                 --transvcsplinpconc
 #

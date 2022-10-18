@@ -1,9 +1,9 @@
 data:
-  train_fid_list: "/mnt/data1/waris/repo/transformer-vc-prosody/train.txt"
-  dev_fid_list: "/mnt/data1/waris/repo/transformer-vc-prosody/dev.txt" 
+  train_fid_list: "/mnt/data1/waris/repo/transformer-prosody-vc/train.txt"
+  dev_fid_list: "/mnt/data1/waris/repo/transformer-prosody-vc/dev.txt" 
   eval_fid_list: "/home/shaunxliu/data/vctk/fidlists/eval_fidlist.txt"
-  #arctic_ppg_dir: "/mnt/data1/waris/model_preprocessing/transformer-vc/bnfs"
-  arctic_ppg_dir: "/mnt/data1/waris/model_preprocessing/FAC-RR"
+  arctic_ppg_dir: "/mnt/data1/waris/model_preprocessing/transformer-vc/bnfs"
+  #arctic_ppg_dir: "/mnt/data1/waris/model_preprocessing/FAC-RR"
   arctic_f0_dir: "/mnt/data1/waris/model_preprocessing/transformer-vc/f0"
   arctic_wav_dir: "/mnt/data1/waris/datasets/data/arctic_dataset/all_data_for_ac_vc_train"
   arctic_spk_dvec_dir: "/mnt/data1/waris/model_preprocessing/transformer-vc/dvec/GE2E_spkEmbed_step_5805000"
@@ -15,7 +15,7 @@ data:
   min_max_norm_mel: true
   mel_min: -12.0
   mel_max: 2.5
-  pretrain_model_file: /mnt/data1/waris/repo/transformer-vc-prosody/ckpt/transformer-vc-rrII/best_loss_step_590000.pth
+  #pretrain_model_file: /mnt/data1/waris/repo/transformer-vc-prosody/ckpt/transformer-vc-rrII/best_loss_step_590000.pth
   
 # hparas:
 #   batch_size: 24

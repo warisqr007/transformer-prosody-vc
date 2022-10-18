@@ -190,26 +190,26 @@ class Transformer(TTSInterface, torch.nn.Module):
         self.prosody_encoder = ProsodyEncoder()
         
         self.prosody_bottleneck = torch.nn.Sequential(
-            torch.nn.Conv1d(32, 4, kernel_size=1, bias=False),
+            torch.nn.Conv1d(256, 32, kernel_size=1, bias=False),
             torch.nn.LeakyReLU(0.1),
 
-            torch.nn.InstanceNorm1d(4, affine=False),
+            torch.nn.InstanceNorm1d(32, affine=False),
             torch.nn.Conv1d(
-                4, 4, 
+                32, 32, 
                 kernel_size=3*3, 
                 stride=2, 
                 padding=2//2,
             ),
             torch.nn.LeakyReLU(0.1),
             
-            torch.nn.InstanceNorm1d(4, affine=False),
+            torch.nn.InstanceNorm1d(32, affine=False),
             torch.nn.Conv1d(
-                4, 32, 
+                32, 256, 
                 kernel_size=1,
                 stride=2
             ),
             torch.nn.LeakyReLU(0.1),
-            torch.nn.InstanceNorm1d(32, affine=False),
+            torch.nn.InstanceNorm1d(256, affine=False),
         )
 
         self.prosody_attention = MultiHeadedAttention(4, 256, 0.2)
@@ -830,11 +830,11 @@ class Transformer(TTSInterface, torch.nn.Module):
     def _integrate_with_prosody_embed(self, hs, hs_masks, prosody_vec):
         #spembs = F.normalize(spembs).unsqueeze(1).expand(-1, hs.size(1), -1)
         prosody_vec, _ = self.prosody_encoder(prosody_vec, None)
-        # prosody_vec = self.prosody_bottleneck(prosody_vec.transpose(1, 2)).transpose(1, 2)
-        prosody_vec_att = self.prosody_attention(hs, prosody_vec, prosody_vec, None)
+        prosody_vec = self.prosody_bottleneck(prosody_vec.transpose(1, 2)).transpose(1, 2)
+        prosody_vec_att = self.prosody_attention(prosody_vec, hs, hs, None)
         #print(f'hs : {hs.shape} \n prosody_vec : {prosody_vec.shape} \n prosody att : {prosody_vec_att.shape}')
 
-        hs = self.prosody_projection(torch.cat([hs, prosody_vec_att], dim=-1))
+        hs =  prosody_vec_att + prosody_vec #self.prosody_projection(torch.cat([hs, prosody_vec_att], dim=-1))
 
         return hs
 
