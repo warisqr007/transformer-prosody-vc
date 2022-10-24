@@ -242,7 +242,7 @@ class Solver(BaseSolver):
                 lr_rate = self.optimizer.pre_step(self.step)
                 total_loss = 0
                 # data to device
-                ppgs, lf0_uvs, mels, in_lengths, \
+                ppgs, mels, in_lengths, \
                     out_lengths, spk_ids, prosody_vec, _, lwav = self.fetch_data(data)
                 self.timer.cnt("rd")
                 loss, after_outs, before_outs, ys, olens = self.model(
@@ -250,7 +250,6 @@ class Solver(BaseSolver):
                     ilens= in_lengths,
                     ys=mels,
                     olens=out_lengths,
-                    logf0_uv=lf0_uvs,
                     spembs=spk_ids,
                     prosody_vec=prosody_vec,
                 )
@@ -282,6 +281,8 @@ class Solver(BaseSolver):
                 # Validation
                 if (self.step == 0) or (self.step % self.valid_step == 0) or (self.step==self.tmp_step_val + 1):
                     self.validate()
+                    # if(self.step % self.inference_step == 0):
+                    #     dd
 
                 # End of step
                 # https://github.com/pytorch/pytorch/issues/13246#issuecomment-529185354
@@ -302,7 +303,7 @@ class Solver(BaseSolver):
             self.progress('Valid step - {}/{}'.format(i+1, len(self.dev_dataloader)))
             # Fetch data
             # ppgs, lf0_uvs, mels, lengths = self.fetch_data(data)
-            ppgs, lf0_uvs, mels, in_lengths, \
+            ppgs, mels, in_lengths, \
                 out_lengths, spk_ids, prosody_vec, _, _ = self.fetch_data(data)
 
             with torch.no_grad():
@@ -311,7 +312,6 @@ class Solver(BaseSolver):
                     ilens= in_lengths,
                     ys=mels,
                     olens=out_lengths,
-                    logf0_uv=lf0_uvs,
                     spembs=spk_ids,
                     prosody_vec=prosody_vec,
                 )

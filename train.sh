@@ -52,12 +52,27 @@ export CUDA_VISIBLE_DEVICES=0
 # Speaker Embed = atinput
 # pitch = no
 # prososy embedding = yes
-# RR block = yes
+#PPG AND PROSODY VEC = BNF
 python main.py  --config /mnt/data1/waris/repo/transformer-prosody-vc/conf/transformer_vc_ppg2mel_outspkdloss_inp_conct_with_rr.yaml \
-                --name=transformer-vc-rrIII \
+                --name=transformer-vc-init \
                 --seed=2 \
                 --transvcsplinpconc
+
+# Status: Trained
+# Results:
 #
+
+# Config 3:
+# Speaker Embed = atinput
+# pitch = no
+# prososy embedding = yes
+# RR block = yes
+# query = HS, K/V = prosody
+# python main.py  --config /mnt/data1/waris/repo/transformer-prosody-vc/conf/transformer_vc_ppg2mel_outspkdloss_inp_conct_with_rr.yaml \
+#                 --name=transformer-vc-rrIV \
+#                 --seed=2 \
+#                 --transvcsplinpconc
+# # 
 # Status: Trained
 # Results:
 #

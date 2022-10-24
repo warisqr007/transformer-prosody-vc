@@ -2,13 +2,14 @@ data:
   train_fid_list: "/mnt/data1/waris/repo/transformer-prosody-vc/train.txt"
   dev_fid_list: "/mnt/data1/waris/repo/transformer-prosody-vc/dev.txt" 
   eval_fid_list: "/home/shaunxliu/data/vctk/fidlists/eval_fidlist.txt"
-  arctic_ppg_dir: "/mnt/data1/waris/model_preprocessing/transformer-vc/bnfs"
-  #arctic_ppg_dir: "/mnt/data1/waris/model_preprocessing/FAC-RR"
+  #arctic_ppg_dir: "/mnt/data1/waris/model_preprocessing/transformer-vc/bnfs"
+  arctic_ppg_dir: "/mnt/data1/waris/datasets/data/arctic_dataset/all_data_for_ac_vc_train/SV2TTS/synthesizer/ppgs"
   arctic_f0_dir: "/mnt/data1/waris/model_preprocessing/transformer-vc/f0"
   arctic_wav_dir: "/mnt/data1/waris/datasets/data/arctic_dataset/all_data_for_ac_vc_train"
   arctic_spk_dvec_dir: "/mnt/data1/waris/model_preprocessing/transformer-vc/dvec/GE2E_spkEmbed_step_5805000"
   prosody_vec_dir: "/mnt/data1/waris/datasets/data/arctic_dataset/all_data_for_ac_vc_train/SV2TTS/synthesizer/ppgs"
-  ppg_file_ext: "ling_feat.npy"
+  #ppg_file_ext: "ling_feat.npy"
+  ppg_file_ext: "npy"
   f0_file_ext: "f0.npy"
   wav_file_ext: "wav"
   prosody_ext: "npy"
@@ -38,11 +39,11 @@ hparas:
 
 model_name: "transformer-vc"
 model:
-  input_size: 144    # 144 ppg_dim and 2 pitch 
+  input_size: 256    # 256 ppg_dim and 2 pitch 
   multi_spk: True
   use_spk_dvec: True  # for one_shot VC
 
-  idim: 144
+  idim: 256
   odim : 80
 
   eprenet_conv_layers: 0  # one more linear layer w/o non_linear will be added for 0_centor
@@ -50,11 +51,11 @@ model:
   eprenet_conv_chans: 0
   dprenet_layers: 2  # one more linear layer w/o non_linear will be added for 0_centor
   dprenet_units: 256
-  adim: 256
+  adim: 512
   aheads: 4
-  elayers: 6
-  eunits: 1536
-  dlayers: 6
+  elayers: 4
+  eunits: 2048
+  dlayers: 4
   dunits: 1536
   postnet_layers: 5
   postnet_filts: 5

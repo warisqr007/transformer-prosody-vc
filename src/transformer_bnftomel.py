@@ -3,6 +3,7 @@
 
 """Voice Transformer Network (Transformer-VC) related modules."""
 
+from distutils.command.config import config
 import imp
 import logging
 import warnings
@@ -90,11 +91,11 @@ class Transformer(TTSInterface, torch.nn.Module):
             else:
                 self.num_heads_applied_guided_attn = args.num_heads_applied_guided_attn
             self.modules_applied_guided_attn = args.modules_applied_guided_attn
-        self.use_f0 = args.use_f0
-        self.use_rr = args.use_rr
+        #self.use_f0 = args.use_f0
+        # self.use_rr = args.use_rr
 
-        if self.use_rr:
-            self.interp = InterpLnr()
+        # if self.use_rr:
+        #     self.interp = InterpLnr()
 
         # use idx 0 as padding idx
         padding_idx = 0
@@ -162,30 +163,30 @@ class Transformer(TTSInterface, torch.nn.Module):
             positionwise_conv_kernel_size=args.positionwise_conv_kernel_size,
         )
 
-        self.pitch_convs = torch.nn.Sequential(
-            torch.nn.Conv1d(2, args.adim, kernel_size=1, bias=False),
-            torch.nn.LeakyReLU(0.1),
+        # self.pitch_convs = torch.nn.Sequential(
+        #     torch.nn.Conv1d(2, args.adim, kernel_size=1, bias=False),
+        #     torch.nn.LeakyReLU(0.1),
 
-            torch.nn.InstanceNorm1d(args.adim, affine=False),
-            torch.nn.Conv1d(
-                args.adim, args.adim, 
-                kernel_size=2*2, 
-                stride=2, 
-                padding=2//2,
-            ),
-            torch.nn.LeakyReLU(0.1),
+        #     torch.nn.InstanceNorm1d(args.adim, affine=False),
+        #     torch.nn.Conv1d(
+        #         args.adim, args.adim, 
+        #         kernel_size=2*2, 
+        #         stride=2, 
+        #         padding=2//2,
+        #     ),
+        #     torch.nn.LeakyReLU(0.1),
             
-            torch.nn.InstanceNorm1d(args.adim, affine=False),
-            torch.nn.Conv1d(
-                args.adim, args.adim, 
-                kernel_size=2*2, 
-                stride=2, 
-                padding=2//2,
-            ),
-            torch.nn.LeakyReLU(0.1),
+        #     torch.nn.InstanceNorm1d(args.adim, affine=False),
+        #     torch.nn.Conv1d(
+        #         args.adim, args.adim, 
+        #         kernel_size=2*2, 
+        #         stride=2, 
+        #         padding=2//2,
+        #     ),
+        #     torch.nn.LeakyReLU(0.1),
 
-            torch.nn.InstanceNorm1d(args.adim, affine=False),
-        )
+        #     torch.nn.InstanceNorm1d(args.adim, affine=False),
+        # )
 
         self.prosody_encoder = ProsodyEncoder()
         
@@ -204,15 +205,15 @@ class Transformer(TTSInterface, torch.nn.Module):
             
             torch.nn.InstanceNorm1d(32, affine=False),
             torch.nn.Conv1d(
-                32, 256, 
+                32, args.adim, 
                 kernel_size=1,
                 stride=2
             ),
             torch.nn.LeakyReLU(0.1),
-            torch.nn.InstanceNorm1d(256, affine=False),
+            torch.nn.InstanceNorm1d(args.adim, affine=False),
         )
 
-        self.prosody_attention = MultiHeadedAttention(4, 256, 0.2)
+        self.prosody_attention = MultiHeadedAttention(4, args.adim, 0.2)
 
         self.prosody_projection = torch.nn.Linear(
             args.adim*2, args.adim
@@ -306,7 +307,7 @@ class Transformer(TTSInterface, torch.nn.Module):
         )
         return ys_in
 
-    def forward(self, xs, ilens, ys, olens, logf0_uv=None, spembs=None, prosody_vec=None, *args, **kwargs):
+    def forward(self, xs, ilens, ys, olens, spembs=None, prosody_vec=None, *args, **kwargs):
         """Calculate forward propagation.
 
         Args:
@@ -331,12 +332,6 @@ class Transformer(TTSInterface, torch.nn.Module):
         if max_olen != ys.shape[1]:
             ys = ys[:, :max_olen]
             # labels = labels[:, :max_olen]
-
-        #random resampling block
-        if self.use_rr:
-            xs = self.interp(xs, ilens)
-            # print(f'xs after rr : {xs.shape}')
-            #ilens = torch.tensor(192).expand(xs.size(0))
 
         
         if self.whereusespkd == 'atinput':
@@ -370,11 +365,11 @@ class Transformer(TTSInterface, torch.nn.Module):
         # print(f'hs_mask shape: {hs_masks.shape}')
 
         #add pitch information
-        if self.use_f0:
-            logf0_uv = self.pitch_convs(logf0_uv.transpose(1, 2)).transpose(1, 2)
-            # print(logf0_uv.shape)
-            # print(hs.shape)
-            hs = hs + logf0_uv
+        # if self.use_f0:
+        #     logf0_uv = self.pitch_convs(logf0_uv.transpose(1, 2)).transpose(1, 2)
+        #     # print(logf0_uv.shape)
+        #     # print(hs.shape)
+        #     hs = hs + logf0_uv
 
         # integrate speaker embedding
         if self.spk_embed_dim is not None and self.whereusespkd != 'atinput':
@@ -522,7 +517,7 @@ class Transformer(TTSInterface, torch.nn.Module):
 
         return loss, after_outs, before_outs, ys, olens
 
-    def inference(self, x, logf0_uv=None, spemb=None, prosody_vec=None, *args, **kwargs):
+    def inference(self, x, spemb=None, prosody_vec=None, *args, **kwargs):
         """Generate the sequence of features given the sequences of acoustic features.
 
         Args:
@@ -572,11 +567,11 @@ class Transformer(TTSInterface, torch.nn.Module):
             x_ds = self._integrate_with_spk_in_embed(x_ds,spembs)
         hs, _ = self.encoder(x_ds, None)
 
-        if self.use_f0:
-            logf0_uv = self.pitch_convs(logf0_uv.transpose(1, 2)).transpose(1, 2)
-            # print(logf0_uv.shape)
-            # print(hs.shape)
-            hs = hs + logf0_uv
+        # if self.use_f0:
+        #     logf0_uv = self.pitch_convs(logf0_uv.transpose(1, 2)).transpose(1, 2)
+        #     # print(logf0_uv.shape)
+        #     # print(hs.shape)
+        #     hs = hs + logf0_uv
 
         # integrate speaker embedding
         if self.spk_embed_dim is not None and self.whereusespkd != 'atinput':
@@ -831,10 +826,17 @@ class Transformer(TTSInterface, torch.nn.Module):
         #spembs = F.normalize(spembs).unsqueeze(1).expand(-1, hs.size(1), -1)
         prosody_vec, _ = self.prosody_encoder(prosody_vec, None)
         prosody_vec = self.prosody_bottleneck(prosody_vec.transpose(1, 2)).transpose(1, 2)
-        prosody_vec_att = self.prosody_attention(prosody_vec, hs, hs, None)
+
+        #config III:
+        # prosody_vec_att = self.prosody_attention(prosody_vec, hs, hs, None)
+        # hs =  prosody_vec_att + prosody_vec
+
+        #config IV:
+        prosody_vec_att = self.prosody_attention(hs, prosody_vec, prosody_vec, None)
         #print(f'hs : {hs.shape} \n prosody_vec : {prosody_vec.shape} \n prosody att : {prosody_vec_att.shape}')
 
-        hs =  prosody_vec_att + prosody_vec #self.prosody_projection(torch.cat([hs, prosody_vec_att], dim=-1))
+        #hs =  prosody_vec_att + hs #
+        hs = self.prosody_projection(torch.cat([hs, prosody_vec_att], dim=-1))
 
         return hs
 
