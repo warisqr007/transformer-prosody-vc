@@ -832,11 +832,11 @@ class Transformer(TTSInterface, torch.nn.Module):
         # hs =  prosody_vec_att + prosody_vec
 
         #config IV:
-        prosody_vec_att = self.prosody_attention(hs, prosody_vec, prosody_vec, None)
+        prosody_vec_att = self.prosody_attention(prosody_vec, hs, hs, None)
         #print(f'hs : {hs.shape} \n prosody_vec : {prosody_vec.shape} \n prosody att : {prosody_vec_att.shape}')
 
         #hs =  prosody_vec_att + hs #
-        hs = self.prosody_projection(torch.cat([hs, prosody_vec_att], dim=-1))
+        hs = self.prosody_projection(torch.cat([prosody_vec, prosody_vec_att], dim=-1))
 
         return hs
 
