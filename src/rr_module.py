@@ -4,7 +4,7 @@ import torch.nn.functional as F
 
 class InterpLnr(nn.Module):
     
-    def __init__(self, max_len_seq=1, max_len_pad=192, min_len_seg=19, max_len_seg=32):
+    def __init__(self, max_len_seq=128, max_len_pad=192, min_len_seg=19, max_len_seg=32):
         super().__init__()
         self.max_len_seq = max_len_seq
         self.max_len_pad = max_len_pad
