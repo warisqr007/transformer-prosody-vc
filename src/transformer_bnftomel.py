@@ -188,7 +188,7 @@ class Transformer(TTSInterface, torch.nn.Module):
         #     torch.nn.InstanceNorm1d(args.adim, affine=False),
         # )
 
-        self.prosody_encoder = ProsodyEncoder()
+        self.prosody_encoder = ProsodyEncoder(256, 256)
         
         self.prosody_bottleneck = torch.nn.Sequential(
             torch.nn.Conv1d(256, 32, kernel_size=1, bias=False),
@@ -213,7 +213,7 @@ class Transformer(TTSInterface, torch.nn.Module):
             torch.nn.InstanceNorm1d(args.adim, affine=False),
         )
 
-        self.prosody_attention = MultiHeadedAttention(4, args.adim, 0.2)
+        #self.prosody_attention = MultiHeadedAttention(4, args.adim, 0.2)
 
         self.prosody_projection = torch.nn.Linear(
             args.adim*2, args.adim
@@ -827,16 +827,16 @@ class Transformer(TTSInterface, torch.nn.Module):
         prosody_vec, _ = self.prosody_encoder(prosody_vec, None)
         prosody_vec = self.prosody_bottleneck(prosody_vec.transpose(1, 2)).transpose(1, 2)
 
-        #config III:
-        # prosody_vec_att = self.prosody_attention(prosody_vec, hs, hs, None)
-        # hs =  prosody_vec_att + prosody_vec
+        # #config III:
+        # # prosody_vec_att = self.prosody_attention(prosody_vec, hs, hs, None)
+        # # hs =  prosody_vec_att + prosody_vec
 
-        #config IV:
-        prosody_vec_att = self.prosody_attention(hs, prosody_vec, prosody_vec, None)
-        #print(f'hs : {hs.shape} \n prosody_vec : {prosody_vec.shape} \n prosody att : {prosody_vec_att.shape}')
+        # #config IV:
+        # prosody_vec_att = self.prosody_attention(hs, prosody_vec, prosody_vec, None)
+        # #print(f'hs : {hs.shape} \n prosody_vec : {prosody_vec.shape} \n prosody att : {prosody_vec_att.shape}')
 
         #hs =  prosody_vec_att + hs #
-        hs = self.prosody_projection(torch.cat([hs, prosody_vec_att], dim=-1))
+        hs = self.prosody_projection(torch.cat([hs, prosody_vec], dim=-1))
 
         return hs
 

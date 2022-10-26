@@ -12,7 +12,8 @@ import torch.nn.functional as F
 class ProsodyEncoder(torch.nn.Module):
     """ Mel-Style Encoder """
 
-    def __init__(self):
+    def __init__(self, input_channels, output_channels, n_spectral_layer=2, 
+                n_temporal_layer=2, n_slf_attn_layer=1, n_slf_attn_head=4):
         super(ProsodyEncoder, self).__init__()
         # n_position = model_config["max_seq_len"] + 1
         # melencoder:
@@ -24,15 +25,15 @@ class ProsodyEncoder(torch.nn.Module):
         # conv_kernel_size: 5
         # encoder_dropout: 0.1
         # add_llayer_for_adv: True
-        n_mel_channels = 256 #model_config["odim"]
-        d_melencoder = 256 #model_config["melencoder"]["encoder_hidden"]
-        n_spectral_layer = 2 #model_config["melencoder"]["spectral_layer"]
-        n_temporal_layer = 2 #model_config["melencoder"]["temporal_layer"]
-        n_slf_attn_layer = 1 #model_config["melencoder"]["slf_attn_layer"]
-        n_slf_attn_head = 4 #model_config["melencoder"]["slf_attn_head"]
+        self.n_mel_channels = input_channels #model_config["odim"]
+        self.d_melencoder = output_channels #model_config["melencoder"]["encoder_hidden"]
+        self.n_spectral_layer = n_spectral_layer #model_config["melencoder"]["spectral_layer"]
+        self.n_temporal_layer = n_temporal_layer #model_config["melencoder"]["temporal_layer"]
+        self.n_slf_attn_layer = n_slf_attn_layer #model_config["melencoder"]["slf_attn_layer"]
+        self.n_slf_attn_head = n_slf_attn_head #model_config["melencoder"]["slf_attn_head"]
         d_k = d_v = (
             128 #model_config["melencoder"]["encoder_hidden"]
-            // 4 #model_config["melencoder"]["slf_attn_head"]
+            // self.n_slf_attn_head #model_config["melencoder"]["slf_attn_head"]
         )
         kernel_size = 5 #model_config["melencoder"]["conv_kernel_size"]
         dropout = 0.2 #model_config["melencoder"]["encoder_dropout"]
@@ -41,12 +42,12 @@ class ProsodyEncoder(torch.nn.Module):
 
         # self.max_seq_len = model_config["max_seq_len"]
 
-        self.fc_1 = FCBlock(n_mel_channels, d_melencoder)
+        self.fc_1 = FCBlock(self.n_mel_channels, self.d_melencoder)
 
         self.spectral_stack = torch.nn.ModuleList(
             [
                 FCBlock(
-                    d_melencoder, d_melencoder, activation=Mish()
+                    self.d_melencoder, self.d_melencoder, activation=Mish()
                 )
                 for _ in range(n_spectral_layer)
             ]
@@ -56,7 +57,7 @@ class ProsodyEncoder(torch.nn.Module):
             [
                 nn.Sequential(
                     Conv1DBlock(
-                        d_melencoder, 2 * d_melencoder, kernel_size, activation=Mish(), dropout=dropout
+                        self.d_melencoder, 2 * self.d_melencoder, kernel_size, activation=Mish(), dropout=dropout
                     ),
                     nn.GLU(),
                 )
@@ -67,16 +68,16 @@ class ProsodyEncoder(torch.nn.Module):
         self.slf_attn_stack = torch.nn.ModuleList(
             [
                 MultiHeadAttention(
-                    n_slf_attn_head, d_melencoder, d_k, d_v, dropout=dropout, layer_norm=True
+                    self.n_slf_attn_head, self.d_melencoder, d_k, d_v, dropout=dropout, layer_norm=True
                 )
                 for _ in range(n_slf_attn_layer)
             ]
         )
 
-        self.fc_2 = FCBlock(d_melencoder, d_melencoder)
+        self.fc_2 = FCBlock(self.d_melencoder, self.d_melencoder)
 
         if self.add_extra_linear:
-            self.fc_3 = FCBlock(d_melencoder, d_melencoder)
+            self.fc_3 = FCBlock(self.d_melencoder, self.d_melencoder)
 
     def forward(self, mel, mask):
 
