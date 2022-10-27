@@ -1,7 +1,7 @@
 #!/bin/bash
 
 . ./path.sh || exit 1;
-export CUDA_VISIBLE_DEVICES=0
+export CUDA_VISIBLE_DEVICES=1
 
 ########## Train BiLSTM oneshot VC model ##########
 # python main.py --config ./conf/bilstm_ppg2mel_vctk_libri_oneshotvc.yaml \
@@ -54,7 +54,7 @@ export CUDA_VISIBLE_DEVICES=0
 # prososy embedding = yes
 #PPG AND PROSODY VEC = BNF
 python main.py  --config /mnt/data1/waris/repo/transformer-prosody-vc/conf/transformer_vc_ppg2mel_outspkdloss_inp_conct_with_rr.yaml \
-                --name=transformer-vc-init-rr \
+                --name=transformer-vc-init-rr-attn \
                 --seed=2 \
                 --transvcsplinpconc
 

@@ -213,7 +213,7 @@ class Transformer(TTSInterface, torch.nn.Module):
             torch.nn.InstanceNorm1d(args.adim, affine=False),
         )
 
-        #self.prosody_attention = MultiHeadedAttention(4, args.adim, 0.2)
+        self.prosody_attention = MultiHeadedAttention(4, args.adim, 0.2)
 
         self.prosody_projection = torch.nn.Linear(
             args.adim*2, args.adim
@@ -307,7 +307,7 @@ class Transformer(TTSInterface, torch.nn.Module):
         )
         return ys_in
 
-    def forward(self, xs, ilens, ys, olens, spembs=None, prosody_vec=None, *args, **kwargs):
+    def forward(self, xs, ilens, ys, olens, spembs=None, prosody_vec=None, prosody_vec_ilen=None, *args, **kwargs):
         """Calculate forward propagation.
 
         Args:
@@ -378,7 +378,8 @@ class Transformer(TTSInterface, torch.nn.Module):
             hs_int = hs
 
         # Add prosody information
-        hs_int = self._integrate_with_prosody_embed(hs_int, hs_masks, prosody_vec)
+        prosody_vec_mask = self._source_mask(prosody_vec_ilen)
+        hs_int = self._integrate_with_prosody_embed(hs_int, prosody_vec, prosody_vec_mask)
 
         # thin out frames for reduction factor (B, Lmax, odim) ->  (B, Lmax//r, odim)
         if self.reduction_factor > 1:
@@ -580,7 +581,7 @@ class Transformer(TTSInterface, torch.nn.Module):
 
         # Add prosody information
         prosody_vec = prosody_vec.unsqueeze(0)
-        hs = self._integrate_with_prosody_embed(hs, None, prosody_vec)
+        hs = self._integrate_with_prosody_embed(hs, prosody_vec, None)
 
         # set limits of length
         # maxlen = int(hs.size(1) * maxlenratio / self.reduction_factor)
@@ -650,6 +651,7 @@ class Transformer(TTSInterface, torch.nn.Module):
         olens,
         spembs=None,
         prosody_vec = None,
+        prosody_vec_ilen = None,
         skip_output=False,
         keep_tensor=False,
         *args,
@@ -699,7 +701,8 @@ class Transformer(TTSInterface, torch.nn.Module):
 
             
             # Add prosody information
-            hs = self._integrate_with_prosody_embed(hs, hs_masks, prosody_vec)
+            prosody_vec_mask = self._source_mask(prosody_vec_ilen)
+            hs = self._integrate_with_prosody_embed(hs, prosody_vec, prosody_vec_mask)
             # thin out frames for reduction factor
             # (B, Lmax, odim) ->  (B, Lmax//r, odim)
             if self.reduction_factor > 1:
@@ -822,21 +825,14 @@ class Transformer(TTSInterface, torch.nn.Module):
 
         return xs
 
-    def _integrate_with_prosody_embed(self, hs, hs_masks, prosody_vec):
-        #spembs = F.normalize(spembs).unsqueeze(1).expand(-1, hs.size(1), -1)
+    def _integrate_with_prosody_embed(self, hs, prosody_vec, prosody_vec_mask):
         prosody_vec, _ = self.prosody_encoder(prosody_vec, None)
         prosody_vec = self.prosody_bottleneck(prosody_vec.transpose(1, 2)).transpose(1, 2)
 
-        # #config III:
-        # # prosody_vec_att = self.prosody_attention(prosody_vec, hs, hs, None)
-        # # hs =  prosody_vec_att + prosody_vec
-
-        # #config IV:
-        # prosody_vec_att = self.prosody_attention(hs, prosody_vec, prosody_vec, None)
-        # #print(f'hs : {hs.shape} \n prosody_vec : {prosody_vec.shape} \n prosody att : {prosody_vec_att.shape}')
-
-        #hs =  prosody_vec_att + hs #
-        hs = self.prosody_projection(torch.cat([hs, prosody_vec], dim=-1))
+        #print(f'hs: {hs.shape} \nProsody vec: {prosody_vec.shape} \nProsody Mask: {prosody_vec_mask.shape}')
+        prosody_vec_att = self.prosody_attention(hs, prosody_vec, prosody_vec, None)
+        
+        hs = self.prosody_projection(torch.cat([hs, prosody_vec_att], dim=-1))
 
         return hs
 

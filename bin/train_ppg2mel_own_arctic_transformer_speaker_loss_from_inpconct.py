@@ -243,7 +243,8 @@ class Solver(BaseSolver):
                 total_loss = 0
                 # data to device
                 ppgs, mels, in_lengths, \
-                    out_lengths, spk_ids, prosody_vec, _, lwav = self.fetch_data(data)
+                    out_lengths, spk_ids, \
+                        prosody_vec, prosody_vec_ilen, _, lwav = self.fetch_data(data)
                 self.timer.cnt("rd")
                 loss, after_outs, before_outs, ys, olens = self.model(
                     xs=ppgs,
@@ -252,6 +253,7 @@ class Solver(BaseSolver):
                     olens=out_lengths,
                     spembs=spk_ids,
                     prosody_vec=prosody_vec,
+                    prosody_vec_ilen=prosody_vec_ilen
                 )
                 # loss = self.loss_criterion(mel_pred, mels, out_lengths)
                 # loss, after_outs, before_outs, logits, ys, labels, olens
@@ -304,7 +306,8 @@ class Solver(BaseSolver):
             # Fetch data
             # ppgs, lf0_uvs, mels, lengths = self.fetch_data(data)
             ppgs, mels, in_lengths, \
-                out_lengths, spk_ids, prosody_vec, _, _ = self.fetch_data(data)
+                out_lengths, spk_ids, \
+                    prosody_vec, prosody_vec_ilen, _, _ = self.fetch_data(data)
 
             with torch.no_grad():
                 loss, after_outs, before_outs, ys, olens = self.model(
@@ -314,6 +317,7 @@ class Solver(BaseSolver):
                     olens=out_lengths,
                     spembs=spk_ids,
                     prosody_vec=prosody_vec,
+                    prosody_vec_ilen=prosody_vec_ilen,
                 )
                 # spkdvs = self.compute_secondary_models(before_outs)
                 # spkd_loss = mseloss(spkdvs,spk_ids)

@@ -354,7 +354,8 @@ class MultiSpkVcCollate():
                 return ret_tup
         else:
             ret_tup = (ppgs_padded, mels_padded, torch.LongTensor(ppg_lengths), \
-                torch.LongTensor(mel_lengths), spk_ids, prosody_vec_padded, stop_tokens, torch.LongTensor([maxlwav]))
+                torch.LongTensor(mel_lengths), spk_ids, prosody_vec_padded, \
+                torch.LongTensor(prosody_vec_lengths), stop_tokens, torch.LongTensor([maxlwav]))
             if self.give_uttids:
                 return ret_tup + (fids, )
             else:
