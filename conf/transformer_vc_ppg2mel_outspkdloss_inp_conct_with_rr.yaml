@@ -70,7 +70,7 @@ model:
   decoder_concat_after: False
   spk_embed_dim: 256
   spk_embed_integration_type : concat
-  whereusespkd : atinput
+  whereusespkd : notatinput
   reduction_factor: 1
   encoder_reduction_factor: 1
   decoder_reduction_factor: 1
