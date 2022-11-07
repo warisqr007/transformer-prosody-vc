@@ -90,6 +90,16 @@ elif paras.transvcsplinpconc:
     solver.exec()
     print(">>> Oneshot VC train finished!")
     sys.exit(0)
+elif paras.prosodypredictor:
+    print(">>> VCT - Speaker loss input conc ...")
+    from bin.train_ppg2mel_own_arctic_transformer_speaker_loss_from_inpconct import Solver
+    mode = "train"
+    solver = Solver(config, paras, mode)
+    solver.load_data()
+    solver.set_model()
+    solver.exec()
+    print(">>> Oneshot VC train finished!")
+    sys.exit(0)
 elif paras.ownarc:
     print(">>> Own VC training ...")
     if paras.bilstm:
