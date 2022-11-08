@@ -2,47 +2,45 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-class InterpLnr(nn.Module):
+class InterpLnr(torch.nn.Module):
     
-    def __init__(self, max_len_seq=1, max_len_pad=192, min_len_seg=19, max_len_seg=32):
-        super().__init__()
-        self.max_len_seq = max_len_seq
-        self.max_len_pad = max_len_pad
+    def __init__(self):
+        super().__init__()        
         
-        self.min_len_seg = min_len_seg
-        self.max_len_seg = max_len_seg
-        
-        self.max_num_seg = self.max_len_seq // self.min_len_seg + 1
-        #self.training = config.train
-        
-        
-    def pad_sequences(self, sequences, max_ilen):
+    def pad_sequences(self, sequences):
         channel_dim = sequences[0].size()[-1]
-        #out_dims = (len(sequences), self.max_len_pad, channel_dim)
-        out_dims = (len(sequences), max_ilen, channel_dim)
+        out_dims = (len(sequences), self.max_len_pad, channel_dim)
         out_tensor = sequences[0].data.new(*out_dims).fill_(0)
         
         for i, tensor in enumerate(sequences):
-            #print(f'in rr before pad seq: {tensor.shape}')
             length = tensor.size(0)
-            #out_tensor[i, :length, :] = tensor[:self.max_len_pad]
-            out_tensor[i, :length, :] = tensor[:max_ilen]
+            out_tensor[i, :length, :] = tensor[:self.max_len_pad]
             
         return out_tensor 
     
 
-    def forward(self, x, len_seq):  
-        
-        # if not self.training:
-        #     #print("Not Training! (from RR)")
-        #     return x
-        
-        #print(f'Training: {self.training}')
-        
+    def forward(self, x):
+
         device = x.device
         batch_size = x.size(0)
-        max_ilen = max(len_seq)
 
+        #self.max_len_seq = 1#config.max_len_seq
+        self.max_len_seq = x.size(1)
+        self.max_len_pad = self.max_len_seq #192#config.max_len_pad
+        
+        self.min_len_seg = 19 #config.min_len_seg
+        self.max_len_seg = 32 #config.max_len_seg
+        
+        self.max_num_seg = self.max_len_seq // self.min_len_seg + 1
+        
+
+        #print(x.device)
+        #len_seq = torch.tensor([x.size(1)]).to(x.device)
+        len_seq = torch.tensor(self.max_len_pad).expand(batch_size).to(device)
+        #print(len_seq)
+
+        
+        
         # indices of each sub segment
         indices = torch.arange(self.max_len_seg*2, device=device)\
                   .unsqueeze(0).expand(batch_size*self.max_num_seg, -1)
@@ -69,6 +67,7 @@ class InterpLnr(nn.Module):
         idx_scaled_org = idx_scaled_fl + offset
         
         len_seq_rp = torch.repeat_interleave(len_seq, self.max_num_seg)
+
         idx_mask_org = idx_scaled_org < (len_seq_rp - 1).unsqueeze(-1)
         
         idx_mask_final = idx_mask & idx_mask_org
@@ -89,6 +88,7 @@ class InterpLnr(nn.Module):
         
         sequences = torch.split(y, counts.tolist(), dim=0)
        
-        seq_padded = self.pad_sequences(sequences, max_ilen)
-        
+        seq_padded = self.pad_sequences(sequences)
+
+        #print(seq_padded.size())
         return seq_padded 

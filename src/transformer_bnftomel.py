@@ -92,10 +92,10 @@ class Transformer(TTSInterface, torch.nn.Module):
                 self.num_heads_applied_guided_attn = args.num_heads_applied_guided_attn
             self.modules_applied_guided_attn = args.modules_applied_guided_attn
         #self.use_f0 = args.use_f0
-        # self.use_rr = args.use_rr
+        self.use_rr = args.use_rr
 
-        # if self.use_rr:
-        #     self.interp = InterpLnr()
+        if self.use_rr:
+            self.interp = InterpLnr()
 
         # use idx 0 as padding idx
         padding_idx = 0
@@ -215,9 +215,14 @@ class Transformer(TTSInterface, torch.nn.Module):
 
         self.prosody_attention = MultiHeadedAttention(4, args.adim, 0.2)
 
-        self.prosody_projection = torch.nn.Linear(
-            args.adim*2, args.adim
-        )
+        if self.spk_embed_dim is not None and self.whereusespkd == 'withprosody':
+            self.prosody_projection = torch.nn.Linear(
+                args.adim*2 + self.spk_embed_dim, args.adim
+            )
+        else:
+            self.prosody_projection = torch.nn.Linear(
+                args.adim*2, args.adim
+            )
 
         # define transformer decoder
         if args.dprenet_layers != 0:
@@ -333,6 +338,8 @@ class Transformer(TTSInterface, torch.nn.Module):
             ys = ys[:, :max_olen]
             # labels = labels[:, :max_olen]
 
+        #RR at train-time
+        xs = self.interp(xs)
         
         if self.whereusespkd == 'atinput':
             xs = self._integrate_with_spk_in_embed(xs,spembs)
@@ -372,14 +379,19 @@ class Transformer(TTSInterface, torch.nn.Module):
         #     hs = hs + logf0_uv
 
         # integrate speaker embedding
-        if self.spk_embed_dim is not None and self.whereusespkd != 'atinput':
+        if self.spk_embed_dim is not None and self.whereusespkd != 'atinput' and self.whereusespkd != 'withprosody':
             hs_int = self._integrate_with_spk_embed(hs, spembs)
         else:
             hs_int = hs
 
         # Add prosody information
-        prosody_vec_mask = self._source_mask(prosody_vec_ilen)
-        hs_int = self._integrate_with_prosody_embed(hs_int, prosody_vec, prosody_vec_mask)
+        if self.whereusespkd == 'withprosody':
+            prosody_vec_mask = self._source_mask(prosody_vec_ilen)
+            hs_int = self._integrate_with_prosody_embed(hs_int, spembs, prosody_vec, prosody_vec_mask)
+        else:
+            prosody_vec_mask = self._source_mask(prosody_vec_ilen)
+            hs_int = self._integrate_with_prosody_embed(hs_int, prosody_vec, prosody_vec_mask)
+
 
         # thin out frames for reduction factor (B, Lmax, odim) ->  (B, Lmax//r, odim)
         if self.reduction_factor > 1:
@@ -575,13 +587,17 @@ class Transformer(TTSInterface, torch.nn.Module):
         #     hs = hs + logf0_uv
 
         # integrate speaker embedding
-        if self.spk_embed_dim is not None and self.whereusespkd != 'atinput':
+        if self.spk_embed_dim is not None and self.whereusespkd != 'atinput' and self.whereusespkd != 'withprosody':
             spembs = spemb.unsqueeze(0)
             hs = self._integrate_with_spk_embed(hs, spembs)
 
+
         # Add prosody information
         prosody_vec = prosody_vec.unsqueeze(0)
-        hs = self._integrate_with_prosody_embed(hs, prosody_vec, None)
+        if self.whereusespkd == 'withprosody':
+            hs = self._integrate_with_prosody_embed(hs_int, spembs, prosody_vec, None)
+        else:
+            hs = self._integrate_with_prosody_embed(hs_int, prosody_vec, None)
 
         # set limits of length
         # maxlen = int(hs.size(1) * maxlenratio / self.reduction_factor)
@@ -833,6 +849,19 @@ class Transformer(TTSInterface, torch.nn.Module):
         prosody_vec_att = self.prosody_attention(hs, prosody_vec, prosody_vec, None)
         
         hs = self.prosody_projection(torch.cat([hs, prosody_vec_att], dim=-1))
+
+        return hs
+    
+    def _integrate_with_prosody_embed(self, hs, spembs, prosody_vec, prosody_vec_mask):
+        prosody_vec, _ = self.prosody_encoder(prosody_vec, None)
+        prosody_vec = self.prosody_bottleneck(prosody_vec.transpose(1, 2)).transpose(1, 2)
+
+        #print(f'hs: {hs.shape} \nProsody vec: {prosody_vec.shape} \nProsody Mask: {prosody_vec_mask.shape}')
+        prosody_vec_att = self.prosody_attention(hs, prosody_vec, prosody_vec, None)
+
+        spembs = F.normalize(spembs).unsqueeze(1).expand(-1, hs.size(1), -1)
+        
+        hs = self.prosody_projection(torch.cat([hs, prosody_vec_att, spembs], dim=-1))
 
         return hs
 

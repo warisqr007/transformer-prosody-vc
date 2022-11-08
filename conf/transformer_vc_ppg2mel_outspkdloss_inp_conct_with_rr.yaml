@@ -3,7 +3,8 @@ data:
   dev_fid_list: "/mnt/data1/waris/repo/transformer-prosody-vc/dev.txt" 
   eval_fid_list: "/home/shaunxliu/data/vctk/fidlists/eval_fidlist.txt"
   #arctic_ppg_dir: "/mnt/data1/waris/model_preprocessing/transformer-vc/bnfs"
-  arctic_ppg_dir: "/mnt/data1/waris/model_preprocessing/transformer-prosody-vc/bnfs"
+  #arctic_ppg_dir: "/mnt/data1/waris/model_preprocessing/transformer-prosody-vc/bnfs"
+  arctic_ppg_dir: "/mnt/data1/waris/datasets/data/arctic_dataset/all_data_for_ac_vc_train/SV2TTS/synthesizer/ppgs"
   arctic_f0_dir: "/mnt/data1/waris/model_preprocessing/transformer-vc/f0"
   arctic_wav_dir: "/mnt/data1/waris/datasets/data/arctic_dataset/all_data_for_ac_vc_train"
   arctic_spk_dvec_dir: "/mnt/data1/waris/model_preprocessing/transformer-vc/dvec/GE2E_spkEmbed_step_5805000"
@@ -70,7 +71,7 @@ model:
   decoder_concat_after: False
   spk_embed_dim: 256
   spk_embed_integration_type : concat
-  whereusespkd : notatinput
+  whereusespkd : withprosody
   reduction_factor: 1
   encoder_reduction_factor: 1
   decoder_reduction_factor: 1
@@ -82,7 +83,7 @@ model:
   use_f0: False
 
   #RR block:
-  use_rr: False
+  use_rr: True
 
   #prosody_vec
   prosody_vec_dim: 256
