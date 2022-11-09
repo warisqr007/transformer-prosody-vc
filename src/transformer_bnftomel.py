@@ -595,9 +595,11 @@ class Transformer(TTSInterface, torch.nn.Module):
         # Add prosody information
         prosody_vec = prosody_vec.unsqueeze(0)
         if self.whereusespkd == 'withprosody':
-            hs = self._integrate_with_prosody_embed(hs_int, spembs, prosody_vec, None)
+            spembs = spemb.unsqueeze(0)
+            hs = self._integrate_with_prosody_embed(hs, spembs, prosody_vec, None)
         else:
-            hs = self._integrate_with_prosody_embed(hs_int, prosody_vec, None)
+            spembs = spemb.unsqueeze(0)
+            hs = self._integrate_with_prosody_embed(hs, prosody_vec, None)
 
         # set limits of length
         # maxlen = int(hs.size(1) * maxlenratio / self.reduction_factor)
