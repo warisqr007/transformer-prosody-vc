@@ -3,7 +3,7 @@ data:
   dev_fid_list: "/mnt/data1/waris/repo/transformer-prosody-vc/dev.txt" 
   eval_fid_list: "/home/shaunxliu/data/vctk/fidlists/eval_fidlist.txt"
   #arctic_ppg_dir: "/mnt/data1/waris/model_preprocessing/transformer-vc/bnfs"
-  arctic_ppg_dir: "/mnt/data1/waris/model_preprocessing/transformer-prosody-vc/bnfs"
+  arctic_ppg_dir: "/mnt/data1/waris/datasets/data/arctic_dataset/all_data_for_ac_vc_train/SV2TTS/synthesizer/ppgs"
   arctic_f0_dir: "/mnt/data1/waris/model_preprocessing/transformer-vc/f0"
   arctic_wav_dir: "/mnt/data1/waris/datasets/data/arctic_dataset/all_data_for_ac_vc_train"
   arctic_spk_dvec_dir: "/mnt/data1/waris/model_preprocessing/transformer-vc/dvec/GE2E_spkEmbed_step_5805000"
@@ -44,7 +44,7 @@ model:
   use_spk_dvec: True  # for one_shot VC
 
   idim: 256
-  odim : 80
+  odim : 256
 
   eprenet_conv_layers: 0  # one more linear layer w/o non_linear will be added for 0_centor
   eprenet_conv_filts: 0
@@ -56,10 +56,10 @@ model:
   elayers: 4
   eunits: 2048
   dlayers: 4
-  dunits: 1536
+  dunits: 2048
   postnet_layers: 5
   postnet_filts: 5
-  postnet_chans: 256
+  postnet_chans: 512
   use_masking: True
   bce_pos_weight: 5.0
   use_batch_norm: True
@@ -68,7 +68,7 @@ model:
   decoder_normalize_before: False
   encoder_concat_after: False
   decoder_concat_after: False
-  spk_embed_dim: 256
+  spk_embed_dim: None
   spk_embed_integration_type : concat
   whereusespkd : notatinput
   reduction_factor: 1
@@ -82,7 +82,7 @@ model:
   use_f0: False
 
   #RR block:
-  use_rr: False
+  use_rr: True
 
   #prosody_vec
   prosody_vec_dim: 256

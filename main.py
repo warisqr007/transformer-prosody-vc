@@ -44,6 +44,7 @@ parser.add_argument('--transvc', action='store_true', help='BiLSTM VC model')
 parser.add_argument('--transvcspdloss', action='store_true', help='BiLSTM VC model')
 parser.add_argument('--transvcspdlossmel', action='store_true', help='BiLSTM VC model')
 parser.add_argument('--transvcsplinpconc', action='store_true', help='Transformer VC model')
+parser.add_argument('--prosodypredictor', action='store_true', help='Prosody Predictor model')
 
 
 ###
@@ -91,14 +92,14 @@ elif paras.transvcsplinpconc:
     print(">>> Oneshot VC train finished!")
     sys.exit(0)
 elif paras.prosodypredictor:
-    print(">>> VCT - Speaker loss input conc ...")
-    from bin.train_ppg2mel_own_arctic_transformer_speaker_loss_from_inpconct import Solver
+    print(">>> Train Prosody Predictor ...")
+    from bin.train_prosody_predictor import Solver
     mode = "train"
     solver = Solver(config, paras, mode)
     solver.load_data()
     solver.set_model()
     solver.exec()
-    print(">>> Oneshot VC train finished!")
+    print(">>> Prosody Predictor train finished!")
     sys.exit(0)
 elif paras.ownarc:
     print(">>> Own VC training ...")

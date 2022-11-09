@@ -538,3 +538,219 @@ class OneshotArciticVcDataset(torch.utils.data.Dataset):
         prosody_vec = prosody_vec[:min_len]
         return f0, ppg, mel, prosody_vec
 
+
+class ProsodyCorrectorDataset(torch.utils.data.Dataset):
+    def __init__(
+        self,
+        meta_file: str,
+        arctic_ppg_dir: str,
+        arctic_f0_dir: str,
+        arctic_wav_dir: str,
+        arctic_spk_dvec_dir: str,
+        prosody_vec_dir: str,
+        min_max_norm_mel: bool = False,
+        mel_min: float = None,
+        mel_max: float = None,
+        ppg_file_ext: str = "ling_feat.npy",
+        f0_file_ext: str = "f0.npy",
+        wav_file_ext: str = "wav",
+        prosody_ext: str = "npy",
+    ):
+        self.fid_list = read_fids(meta_file)
+        self.arctic_ppg_dir = arctic_ppg_dir
+        self.arctic_f0_dir = arctic_f0_dir
+        self.arctic_wav_dir = arctic_wav_dir
+        self.arctic_spk_dvec_dir = arctic_spk_dvec_dir
+        self.prosody_vec_dir = prosody_vec_dir
+
+
+        self.ppg_file_ext = ppg_file_ext
+        self.f0_file_ext = f0_file_ext
+        self.wav_file_ext = wav_file_ext
+        self.prosody_ext = prosody_ext
+
+        self.min_max_norm_mel = min_max_norm_mel
+        if min_max_norm_mel:
+            print("[INFO] Min-Max normalize Melspec.")
+            assert mel_min is not None
+            assert mel_max is not None
+            self.mel_max = mel_max
+            self.mel_min = mel_min
+        
+        random.seed(1234)
+        random.shuffle(self.fid_list)
+        print(f'[INFO] Got {len(self.fid_list)} samples.')
+        
+    def __len__(self):
+        return len(self.fid_list)
+    
+    def get_spk_dvec(self, fid):
+        spk_dvec_path = f"{self.arctic_spk_dvec_dir}/{fid}.npy"
+        return torch.from_numpy(np.load(spk_dvec_path))
+    
+    def get_prosody_input(self, fid): #ppg-ERMS-arctic_a0343.npy
+        sprf , wfle = fid.split('/')
+        prosody_vec = np.load(f"{self.prosody_vec_dir}/ppg-{sprf}-{wfle}.{self.prosody_ext}")
+        return prosody_vec
+
+    def get_ppg_input(self, fid): #ppg-ERMS-arctic_a0343.npy
+        sprf , wfle = fid.split('/')
+        ppg = np.load(f"{self.arctic_ppg_dir}/ppg-{sprf}-{wfle}.{self.ppg_file_ext}")
+        return ppg
+    
+    def compute_mel(self, wav_path):
+        audio, sr = load_wav(wav_path)
+        lwav = len(audio)
+        if sr != 24000:
+            audio = resampy.resample(audio, sr, 24000)
+        audio = audio / MAX_WAV_VALUE
+        audio = normalize(audio) * 0.95
+        audio = torch.FloatTensor(audio).unsqueeze(0)
+        melspec = mel_spectrogram(
+            audio,
+            n_fft=1024,
+            num_mels=80,
+            sampling_rate=24000,
+            hop_size=240,
+            win_size=1024,
+            fmin=0,
+            fmax=8000,
+        )
+        return melspec.squeeze(0).numpy().T, lwav
+
+    def bin_level_min_max_norm(self, melspec):
+        # frequency bin level min-max normalization to [-4, 4]
+        mel = (melspec - self.mel_min) / (self.mel_max - self.mel_min) * 8.0 - 4.0
+        return np.clip(mel, -4., 4.)   
+
+    def __getitem__(self, index):
+        fid = self.fid_list[index]
+        
+        # 1. Load features
+        sprf , wfle = fid.split('/')
+        ppg_in = self.get_ppg_input(fid)
+        ppg_tr = self.get_ppg_input(fid)
+        # f0 = np.load(f"{self.arctic_f0_dir}/{fid}.{self.f0_file_ext}")
+        # mel, lwav = self.compute_mel(f"{self.arctic_wav_dir}/{sprf}/wav/{wfle}.{self.wav_file_ext}")
+        # if self.min_max_norm_mel:
+        #     mel = self.bin_level_min_max_norm(mel)
+        
+        prosody_vec = self.get_prosody_input(fid)
+
+        #f0, ppg, mel, prosody_vec = self._adjust_lengths(f0, ppg, mel, prosody_vec)
+        # spk_dvec = self.get_spk_dvec(fid)
+
+        # 2. Convert f0 to continuous log-f0 and u/v flags
+        # uv, cont_lf0 = get_cont_lf0(f0, 10.0, False)
+        # cont_lf0 = (cont_lf0 - np.amin(cont_lf0)) / (np.amax(cont_lf0) - np.amin(cont_lf0))
+        # cont_lf0 = self.utt_mvn(cont_lf0)
+        # lf0_uv = np.concatenate([cont_lf0[:, np.newaxis], uv[:, np.newaxis]], axis=1)
+
+        # uv, cont_f0 = convert_continuous_f0(f0)
+        # cont_f0 = (cont_f0 - np.amin(cont_f0)) / (np.amax(cont_f0) - np.amin(cont_f0))
+        # lf0_uv = np.concatenate([cont_f0[:, np.newaxis], uv[:, np.newaxis]], axis=1)
+        
+        # 3. Convert numpy array to torch.tensor
+        ppg_in = torch.from_numpy(ppg_in)
+        ppg_tr = torch.from_numpy(ppg_tr)
+        # lf0_uv = torch.from_numpy(lf0_uv)
+        # mel = torch.from_numpy(mel)
+        prosody_vec = torch.from_numpy(prosody_vec)
+        return (ppg_in, ppg_tr, prosody_vec, fid)
+
+    def check_lengths(self, f0, ppg, mel):
+        LEN_THRESH = 10
+        assert abs(len(ppg) - len(f0)) <= LEN_THRESH, \
+            f"{abs(len(ppg) - len(f0))}"
+        assert abs(len(mel) - len(f0)) <= LEN_THRESH, \
+            f"{abs(len(mel) - len(f0))}"
+    
+    def _adjust_lengths(self, f0, ppg, mel, prosody_vec):
+        #self.check_lengths(f0, ppg, mel)
+        min_len = min(
+            len(f0),
+            len(ppg),
+            len(mel),
+            len(prosody_vec),
+        )
+        f0 = f0[:min_len]
+        ppg = ppg[:min_len]
+        mel = mel[:min_len]
+        prosody_vec = prosody_vec[:min_len]
+        return f0, ppg, mel, prosody_vec
+
+class ProsodyCorrectorCollate():
+    """Zero-pads model inputs and targets based on number of frames per step
+    """
+    def __init__(self, n_frames_per_step=1, give_uttids=False,
+                 f02ppg_length_ratio=1, use_spk_dvec=False):
+        self.n_frames_per_step = n_frames_per_step
+        self.give_uttids = give_uttids
+        self.f02ppg_length_ratio = f02ppg_length_ratio
+        self.use_spk_dvec = use_spk_dvec
+
+    def __call__(self, batch):
+        batch_size = len(batch)              
+        # Prepare different features 
+        # Input = (ppg_in, ppg_tr, prosody_vec, fid)
+        ppgs = [x[0] for x in batch]
+        #lf0_uvs = [x[1] for x in batch]
+        ppgs_tr = [x[1] for x in batch]
+        fids = [x[-1] for x in batch]
+        # lwav = [x[-1] for x in batch]
+        # maxlwav = max(lwav)
+        # print(f'torch batch length : {batch[0]}')
+        # spk_ids = [x[2] for x in batch]
+        # spk_ids = torch.stack(spk_ids).float()
+
+        prosody_vec = [x[2] for x in batch]
+        # if len(batch[0]) == 5:
+        #     spk_ids = [x[2] for x in batch]
+        #     if self.use_spk_dvec:
+        #         # use d-vector
+        #         spk_ids = torch.stack(spk_ids).float()
+        #     else:
+        #         # use one-hot ids
+        #         spk_ids = torch.LongTensor(spk_ids)
+        # Pad features into chunk
+        ppg_lengths = [x.shape[0] for x in ppgs]
+        ppg_tr_lengths = [x.shape[0] for x in ppgs_tr]
+        prosody_vec_lengths = [x.shape[0] for x in prosody_vec]
+        max_ppg_len = max(ppg_lengths)
+        max_ppg_tr_len = max(ppg_tr_lengths)
+        max_prosody_vec_len = max(prosody_vec_lengths)
+        # if max_mel_len % self.n_frames_per_step != 0:
+        #     max_mel_len += (self.n_frames_per_step - max_mel_len % self.n_frames_per_step)
+        ppg_dim = ppgs[0].shape[1]
+        ppg_tr_dim = ppgs_tr[0].shape[1]
+        prosody_vec_dim = prosody_vec[0].shape[1]
+        ppgs_padded = torch.FloatTensor(batch_size, max_ppg_len, ppg_dim).zero_()
+        ppgs_tr_padded = torch.FloatTensor(batch_size, max_ppg_tr_len, ppg_tr_dim).zero_()
+        #lf0_uvs_padded = torch.FloatTensor(batch_size, self.f02ppg_length_ratio * max_ppg_len, 2).zero_()
+        stop_tokens = torch.FloatTensor(batch_size, max_ppg_tr_len).zero_()
+        prosody_vec_padded = torch.FloatTensor(batch_size, max_prosody_vec_len, prosody_vec_dim).zero_()
+        for i in range(batch_size):
+            cur_ppg_len = ppgs[i].shape[0]
+            cur_ppg_tr_len = ppgs_tr[i].shape[0]
+            ppgs_padded[i, :cur_ppg_len, :] = ppgs[i]
+            #lf0_uvs_padded[i, :self.f02ppg_length_ratio*cur_ppg_len, :] = lf0_uvs[i]
+            ppgs_tr_padded[i, :cur_ppg_tr_len, :] = ppgs_tr[i]
+            stop_tokens[i, cur_ppg_len-self.n_frames_per_step:] = 1
+            cur_prosody_vec_len = prosody_vec[i].shape[0]
+            prosody_vec_padded[i, :cur_prosody_vec_len, :] = prosody_vec[i]
+        if False:
+            print('hererererere')
+            ret_tup = (ppgs_padded, ppgs_tr_padded, torch.LongTensor(ppg_lengths), \
+                torch.LongTensor(mel_lengths), spk_ids, stop_tokens,torch.IntTensor(maxlwav))
+            if self.give_uttids:
+                return ret_tup + (fids, )
+            else:
+                return ret_tup
+        else:
+            ret_tup = (ppgs_padded, ppgs_tr_padded, torch.LongTensor(ppg_lengths), \
+                torch.LongTensor(ppg_tr_lengths), prosody_vec_padded, \
+                torch.LongTensor(prosody_vec_lengths), stop_tokens)
+            if self.give_uttids:
+                return ret_tup + (fids, )
+            else:
+                return ret_tup

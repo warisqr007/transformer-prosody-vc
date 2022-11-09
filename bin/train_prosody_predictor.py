@@ -3,8 +3,8 @@ from torch.utils.data import DataLoader
 import numpy as np
 from src.solver import BaseSolver
 # from src.data_load import VcDataset, VcCollate
-from src.data_load import OneshotVcDataset, MultiSpkVcCollate, OneshotArciticVcDataset
-from src.transformer_bnftomel import Transformer
+from src.data_load import ProsodyCorrectorCollate, ProsodyCorrectorDataset
+from src.transformer_rrbnftobnf import Transformer
 from src.optim import Optimizer
 import torch_optimizer as optim
 from src.util import human_format, feat_to_fig
@@ -32,7 +32,7 @@ class Solver(BaseSolver):
 
     def load_data(self):
         """ Load data for training/validation/plotting."""
-        train_dataset = OneshotArciticVcDataset(
+        train_dataset = ProsodyCorrectorDataset(
             meta_file=self.config.data.train_fid_list,
             arctic_ppg_dir = self.config.data.arctic_ppg_dir,
             arctic_f0_dir = self.config.data.arctic_f0_dir,
@@ -44,7 +44,7 @@ class Solver(BaseSolver):
             mel_min=self.config.data.mel_min,
             mel_max=self.config.data.mel_max,
         )
-        dev_dataset = OneshotArciticVcDataset(
+        dev_dataset = ProsodyCorrectorDataset(
             meta_file=self.config.data.dev_fid_list,
             arctic_ppg_dir = self.config.data.arctic_ppg_dir,
             arctic_f0_dir = self.config.data.arctic_f0_dir,
@@ -63,9 +63,9 @@ class Solver(BaseSolver):
             batch_size=self.config.hparas.batch_size,
             pin_memory=False,
             drop_last=True,
-            collate_fn=MultiSpkVcCollate(n_frames_per_step=1,
-                                         f02ppg_length_ratio=1,
-                                         use_spk_dvec=True),
+            collate_fn=ProsodyCorrectorCollate(n_frames_per_step=1,
+                                            f02ppg_length_ratio=1,
+                                            use_spk_dvec=True),
         )
         self.dev_dataloader = DataLoader(
             dev_dataset,
@@ -74,9 +74,9 @@ class Solver(BaseSolver):
             batch_size=self.config.hparas.batch_size,
             pin_memory=False,
             drop_last=False,
-            collate_fn=MultiSpkVcCollate(n_frames_per_step=1,
-                                         f02ppg_length_ratio=1,
-                                         use_spk_dvec=True),
+            collate_fn=ProsodyCorrectorCollate(n_frames_per_step=1,
+                                            f02ppg_length_ratio=1,
+                                            use_spk_dvec=True),
         )
         msg = "Have prepared training set and dev set."
         self.verbose(msg)
@@ -242,16 +242,15 @@ class Solver(BaseSolver):
                 lr_rate = self.optimizer.pre_step(self.step)
                 total_loss = 0
                 # data to device
-                ppgs, mels, in_lengths, \
-                    out_lengths, spk_ids, \
-                        prosody_vec, prosody_vec_ilen, _, lwav = self.fetch_data(data)
+                ppgs, ppgs_tr, in_lengths, \
+                    out_lengths, prosody_vec, \
+                    prosody_vec_ilen, _  = self.fetch_data(data)
                 self.timer.cnt("rd")
                 loss, after_outs, before_outs, ys, olens = self.model(
                     xs=ppgs,
                     ilens= in_lengths,
-                    ys=mels,
+                    ys=ppgs_tr,
                     olens=out_lengths,
-                    spembs=spk_ids,
                     prosody_vec=prosody_vec,
                     prosody_vec_ilen=prosody_vec_ilen
                 )
@@ -305,17 +304,16 @@ class Solver(BaseSolver):
             self.progress('Valid step - {}/{}'.format(i+1, len(self.dev_dataloader)))
             # Fetch data
             # ppgs, lf0_uvs, mels, lengths = self.fetch_data(data)
-            ppgs, mels, in_lengths, \
-                out_lengths, spk_ids, \
-                    prosody_vec, prosody_vec_ilen, _, _ = self.fetch_data(data)
+            ppgs, ppgs_tr, in_lengths, \
+                out_lengths, prosody_vec, \
+                prosody_vec_ilen, _ = self.fetch_data(data)
 
             with torch.no_grad():
                 loss, after_outs, before_outs, ys, olens = self.model(
                     xs=ppgs,
                     ilens= in_lengths,
-                    ys=mels,
+                    ys=ppgs_tr,
                     olens=out_lengths,
-                    spembs=spk_ids,
                     prosody_vec=prosody_vec,
                     prosody_vec_ilen=prosody_vec_ilen,
                 )
