@@ -16,7 +16,7 @@ data:
   min_max_norm_mel: true
   mel_min: -12.0
   mel_max: 2.5
-  #pretrain_model_file: /mnt/data1/waris/repo/transformer-vc-prosody/ckpt/transformer-vc-rrII/best_loss_step_590000.pth
+  pretrain_model_file: '/mnt/data1/waris/repo/transformer-prosody-vc/ckpt/prosody-predictor/best_loss_step_520000.pth'
   
 # hparas:
 #   batch_size: 24
@@ -37,7 +37,7 @@ hparas:
   weight_decay: 0
   lr_scheduler:    # "fixed", "warmup"
 
-model_name: "transformer-vc"
+model_name: "prosody-predictor"
 model:
   input_size: 256    # 256 ppg_dim and 2 pitch 
   multi_spk: True

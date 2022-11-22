@@ -4,7 +4,6 @@ Compute CTC-Attention Seq2seq ASR encoder bottle-neck features (BNF).
 import sys
 import os
 import argparse
-import torch
 import glob2
 import soundfile
 import librosa
@@ -14,8 +13,6 @@ import torch.nn.functional as F
 import numpy as np
 from tqdm import tqdm
 
-
-SAMPLE_RATE=16000
 
 class InterpLnr(torch.nn.Module):
     
