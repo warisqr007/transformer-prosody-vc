@@ -78,6 +78,8 @@ class ProsodyEncoder(torch.nn.Module):
 
         if self.add_extra_linear:
             self.fc_3 = FCBlock(self.d_melencoder, self.d_melencoder)
+        
+        self.avg_pool = nn.AvgPool1d(8, stride=4)
 
     def forward(self, mel, mask):
 
@@ -116,6 +118,7 @@ class ProsodyEncoder(torch.nn.Module):
 
         # Temporal Average Pooling
         # enc_output = torch.mean(enc_output, dim=1, keepdim=True) # [B, 1, H]
+        enc_output = self.avg_pool(enc_output.transpose(1, 2)).transpose(1, 2)
 
         return enc_output, residual
 
