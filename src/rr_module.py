@@ -4,9 +4,12 @@ import torch.nn.functional as F
 
 class InterpLnr(torch.nn.Module):
     
-    def __init__(self):
+    def __init__(self, min_len_seg=24, max_len_seg=64):
         super().__init__()        
         
+        self.min_len_seg = min_len_seg
+        self.max_len_seg = max_len_seg
+
     def pad_sequences(self, sequences):
         channel_dim = sequences[0].size()[-1]
         out_dims = (len(sequences), self.max_len_pad, channel_dim)
@@ -28,8 +31,8 @@ class InterpLnr(torch.nn.Module):
         self.max_len_seq = x.size(1)
         self.max_len_pad = self.max_len_seq #192#config.max_len_pad
         
-        self.min_len_seg = 19 #config.min_len_seg
-        self.max_len_seg = 32 #config.max_len_seg
+        #self.min_len_seg = 24 #config.min_len_seg
+        #self.max_len_seg = 64 #config.max_len_seg
         
         self.max_num_seg = self.max_len_seq // self.min_len_seg + 1
         
