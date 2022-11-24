@@ -534,7 +534,7 @@ class Transformer(TTSInterface, torch.nn.Module):
 
         # forward encoder
         x_ds = x_ds.unsqueeze(0)
-        hs, hs_masks = self.encoder(x_ds, None)
+        hs, _ = self.encoder(x_ds, None)
 
         # if self.use_f0:
         #     logf0_uv = self.pitch_convs(logf0_uv.transpose(1, 2)).transpose(1, 2)
@@ -544,7 +544,7 @@ class Transformer(TTSInterface, torch.nn.Module):
 
         # Add prosody information
         prosody_vec = prosody_vec.unsqueeze(0)
-        hs, _ = self._integrate_with_prosody_embed(hs, hs_masks, prosody_vec, None)
+        hs, _ = self._integrate_with_prosody_embed(hs, None, prosody_vec, None)
 
         # set limits of length
         # maxlen = int(hs.size(1) * maxlenratio / self.reduction_factor)
@@ -759,7 +759,8 @@ class Transformer(TTSInterface, torch.nn.Module):
             prosody_vec = self.pad_sequences(prosody_vec, hs.size(1))
         else:
             hs = self.pad_sequences(hs, prosody_vec.size(1))
-            hs_masks = self.pad_sequences(hs_masks.transpose(1,2), prosody_vec.size(1)).transpose(1, 2)
+            if hs_masks is not None:
+                hs_masks = self.pad_sequences(hs_masks.transpose(1,2), prosody_vec.size(1)).transpose(1, 2)
         # print(f'hs: {hs.shape} \nProsody vec: {prosody_vec.shape} \nProsody Mask: {prosody_vec_mask.shape}')
         hs = self.prosody_projection(torch.cat([hs, prosody_vec], dim=-1))
 

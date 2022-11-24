@@ -54,7 +54,7 @@ if __name__ == "__main__":
 
     ppg2ppg_model_train_config = Path('/mnt/data1/waris/repo/transformer-prosody-vc/conf/transformer_prosody_predictor.yaml')
     ppg2ppg_config = HpsYaml(ppg2ppg_model_train_config) 
-    ppg2ppg_model_file = Path('/mnt/data1/waris/repo/transformer-prosody-vc/ckpt/prosody-predictor/best_loss_step_520000.pth')
+    ppg2ppg_model_file = Path('/mnt/data1/waris/repo/transformer-prosody-vc/ckpt/prosody-predictor-II/best_loss_step_420000.pth')
     device = 'cuda'
     ppg2ppg_model = build_transf_model(ppg2ppg_config, ppg2ppg_model_file, device)
 
@@ -63,7 +63,7 @@ if __name__ == "__main__":
     #utterance_ids = ['arctic_a00'+str(i) for i in range(10, 30)] + ['arctic_b0534', 'arctic_b0537', 'arctic_b0538', 'arctic_b0539']
 
     basepath = '/mnt/data1/waris/datasets/data/arctic_dataset/test_speakers_16k'
-    output_dir = '/mnt/data1/waris/repo/transformer-prosody-vc/synthesis_output/prosody_corrected_bnfs/prosody-attn/'
+    output_dir = '/mnt/data1/waris/repo/transformer-prosody-vc/synthesis_output/prosody_corrected_bnfs/prosody_16d/'
 
     for speaker in speakers:
         src_speaker_fpath = os.path.join(basepath, 'BDL')
@@ -72,7 +72,7 @@ if __name__ == "__main__":
         for utterance_id in utterance_ids:
             convert(src_speaker_fpath, tgt_speaker_fpath, utterance_id, output_dir)
 
-    output_dir = '/mnt/data1/waris/repo/transformer-prosody-vc/synthesis_output/prosody_corrected_bnfs/prosody-attn/'
+    #output_dir = '/mnt/data1/waris/repo/transformer-prosody-vc/synthesis_output/prosody_corrected_bnfs/prosody-attn/'
 
 
 
