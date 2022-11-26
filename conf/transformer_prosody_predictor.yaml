@@ -16,7 +16,7 @@ data:
   min_max_norm_mel: true
   mel_min: -12.0
   mel_max: 2.5
-  #pretrain_model_file: '/mnt/data1/waris/repo/transformer-prosody-vc/ckpt/prosody-predictor/best_loss_step_520000.pth'
+  pretrain_model_file: '/mnt/data1/waris/repo/transformer-prosody-vc/ckpt/prosody-predictor-II/best_loss_step_460000.pth'
   
 # hparas:
 #   batch_size: 24
