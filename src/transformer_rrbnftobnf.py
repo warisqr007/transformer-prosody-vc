@@ -520,7 +520,8 @@ class Transformer(TTSInterface, torch.nn.Module):
 
         # thin out input frames for reduction factor
         # (B, Lmax, idim) ->  (B, Lmax // r, idim * r)
-        olens = x.shape[0]
+        # olens = x.shape[0]
+        olens = prosody_vec.shape[0]
         if self.encoder_reduction_factor > 1:
             Lmax, idim = x.shape
             if Lmax % self.encoder_reduction_factor != 0:

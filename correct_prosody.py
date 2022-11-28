@@ -54,7 +54,7 @@ if __name__ == "__main__":
 
     ppg2ppg_model_train_config = Path('/mnt/data1/waris/repo/transformer-prosody-vc/conf/transformer_prosody_predictor.yaml')
     ppg2ppg_config = HpsYaml(ppg2ppg_model_train_config) 
-    ppg2ppg_model_file = Path('/mnt/data1/waris/repo/transformer-prosody-vc/ckpt/prosody-predictor-II/best_loss_step_420000.pth')
+    ppg2ppg_model_file = Path('/mnt/data1/waris/repo/transformer-prosody-vc/ckpt/prosody-predictor-II/best_loss_step_590000.pth')
     device = 'cuda'
     ppg2ppg_model = build_transf_model(ppg2ppg_config, ppg2ppg_model_file, device)
 
