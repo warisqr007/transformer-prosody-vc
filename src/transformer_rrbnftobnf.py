@@ -168,7 +168,7 @@ class Transformer(TTSInterface, torch.nn.Module):
         #     torch.nn.InstanceNorm1d(args.adim, affine=False),
         # )
 
-        self.prosody_encoder = ProsodyEncoder(256, 16)
+        self.prosody_encoder = ProsodyEncoder(80, 32)
         
         # self.prosody_bottleneck = torch.nn.Sequential(
         #     torch.nn.Conv1d(256, 32, kernel_size=1, bias=False),
@@ -196,7 +196,7 @@ class Transformer(TTSInterface, torch.nn.Module):
         #self.prosody_attention = MultiHeadedAttention(4, args.adim, 0.2)
 
         self.prosody_projection = torch.nn.Linear(
-            args.adim + 16, args.adim
+            args.adim + 32, args.adim
         )
 
         # define transformer decoder
@@ -405,8 +405,9 @@ class Transformer(TTSInterface, torch.nn.Module):
         l1_loss, l2_loss, bce_loss = self.criterion(
             after_outs, before_outs, ys, olens
         )
-        # loss = l1_loss + l2_loss 
-        loss = l2_loss
+        
+        loss = l1_loss + l2_loss 
+        #loss = l2_loss
         # if self.loss_type == "L1":
         #     loss = l1_loss 
         # elif self.loss_type == "L2":
@@ -520,7 +521,7 @@ class Transformer(TTSInterface, torch.nn.Module):
 
         # thin out input frames for reduction factor
         # (B, Lmax, idim) ->  (B, Lmax // r, idim * r)
-        # olens = x.shape[0]
+        #olens = x.shape[0]
         olens = prosody_vec.shape[0]
         if self.encoder_reduction_factor > 1:
             Lmax, idim = x.shape

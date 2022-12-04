@@ -569,7 +569,7 @@ class ProsodyCorrectorDataset(torch.utils.data.Dataset):
         self.f0_file_ext = f0_file_ext
         self.wav_file_ext = wav_file_ext
         self.prosody_ext = prosody_ext
-        self.interp = InterpLnr()
+        #self.interp = InterpLnr()
 
         self.min_max_norm_mel = min_max_norm_mel
         if min_max_norm_mel:
@@ -597,7 +597,12 @@ class ProsodyCorrectorDataset(torch.utils.data.Dataset):
 
     def get_ppg_input(self, fid): #ppg-ERMS-arctic_a0343.npy
         sprf , wfle = fid.split('/')
-        ppg = np.load(f"{self.arctic_ppg_dir}/ppg-{sprf}-{wfle}.{self.ppg_file_ext}")
+        ppg = np.load(f"{self.arctic_ppg_dir}/ppgs/ppg-{sprf}-{wfle}.{self.ppg_file_ext}")
+        return ppg
+    
+    def get_ppg_target(self, fid): #ppg-ERMS-arctic_a0343.npy
+        sprf , wfle = fid.split('/')
+        ppg = np.load(f"{self.arctic_ppg_dir}/mels/mel-{sprf}-{wfle}.{self.ppg_file_ext}")
         return ppg
     
     def compute_mel(self, wav_path):
@@ -631,15 +636,16 @@ class ProsodyCorrectorDataset(torch.utils.data.Dataset):
         # 1. Load features
         sprf , wfle = fid.split('/')
         ppg_in = self.get_ppg_input(fid)
-        ppg_in = self.interp(ppg_in)
+        #ppg_in = self.interp(ppg_in)
 
-        ppg_tr = self.get_ppg_input(fid)
+        ppg_tr = self.get_ppg_target(fid)
         # f0 = np.load(f"{self.arctic_f0_dir}/{fid}.{self.f0_file_ext}")
         # mel, lwav = self.compute_mel(f"{self.arctic_wav_dir}/{sprf}/wav/{wfle}.{self.wav_file_ext}")
         # if self.min_max_norm_mel:
         #     mel = self.bin_level_min_max_norm(mel)
         
-        prosody_vec = self.get_prosody_input(fid)
+        #prosody_vec = self.get_prosody_input(fid)
+        prosody_vec, _ = self.compute_mel(f"{self.arctic_wav_dir}/{sprf}/wav/{wfle}.{self.wav_file_ext}")
 
         #f0, ppg, mel, prosody_vec = self._adjust_lengths(f0, ppg, mel, prosody_vec)
         # spk_dvec = self.get_spk_dvec(fid)
@@ -763,7 +769,7 @@ class ProsodyCorrectorCollate():
 
 class InterpLnr(torch.nn.Module):
     
-    def __init__(self, min_len_seg=24, max_len_seg=64):
+    def __init__(self, min_len_seg=48, max_len_seg=64):
         super().__init__()        
         
         self.min_len_seg = min_len_seg
@@ -809,8 +815,19 @@ class InterpLnr(torch.nn.Module):
         indices = torch.arange(self.max_len_seg*2, device=device)\
                   .unsqueeze(0).expand(batch_size*self.max_num_seg, -1)
         # scales of each sub segment
-        scales = torch.rand(batch_size*self.max_num_seg, 
+        # scales = torch.rand(batch_size*self.max_num_seg, 
+        #                     device=device) + 0.5
+
+        scales_squeezed = 0.2*torch.rand(batch_size*self.max_num_seg, 
                             device=device) + 0.5
+
+        scales_enlong = 0.2*torch.rand(batch_size*self.max_num_seg, 
+                            device=device) + 1.3
+        
+        scales = torch.cat((scales_squeezed, scales_enlong))
+        perm = torch.randperm(scales.size(0))
+        idx = perm[:batch_size*self.max_num_seg]
+        scales = scales[idx]
         
         idx_scaled = indices / scales.unsqueeze(-1)
         idx_scaled_fl = torch.floor(idx_scaled)
