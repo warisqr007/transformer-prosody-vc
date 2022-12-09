@@ -77,7 +77,7 @@ if __name__ == "__main__":
 
     ppg2ppg_model_train_config = Path('/mnt/data1/waris/repo/transformer-prosody-vc/conf/transformer_prosody_predictor.yaml')
     ppg2ppg_config = HpsYaml(ppg2ppg_model_train_config) 
-    ppg2ppg_model_file = Path('/mnt/data1/waris/repo/transformer-prosody-vc/ckpt/prosody-predictor-mel/best_loss_step_170000.pth')
+    ppg2ppg_model_file = Path('/mnt/data1/waris/repo/transformer-prosody-vc/ckpt/prosody-predictor-mel-attn/best_loss_step_400000.pth')
     device = 'cuda'
     ppg2ppg_model = build_transf_model(ppg2ppg_config, ppg2ppg_model_file, device)
 
@@ -88,7 +88,7 @@ if __name__ == "__main__":
 
     basepath = '/mnt/data1/waris/datasets/data/arctic_dataset/test_speakers_16k'
     #basepath = '/mnt/data1/waris/datasets/data/arctic_dataset/all_data_for_ac_vc_train'
-    output_dir = '/mnt/data1/waris/repo/transformer-prosody-vc/synthesis_output/prosody_corrected_bnfs/prosody_32d_mel_l1_align/'
+    output_dir = '/mnt/data1/waris/repo/transformer-prosody-vc/synthesis_output/prosody_corrected_bnfs/prosody_32d_mel_l1_align_attn/'
 
     for speaker in speakers:
         src_speaker_fpath = os.path.join(basepath, 'BDL')

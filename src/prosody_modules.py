@@ -13,7 +13,7 @@ class ProsodyEncoder(torch.nn.Module):
     """ Mel-Style Encoder """
 
     def __init__(self, input_channels, output_channels, n_spectral_layer=2, 
-                n_temporal_layer=2, n_slf_attn_layer=1, n_slf_attn_head=4):
+                n_temporal_layer=2, n_slf_attn_layer=1, n_slf_attn_head=4, pool=False):
         super(ProsodyEncoder, self).__init__()
         # n_position = model_config["max_seq_len"] + 1
         # melencoder:
@@ -31,6 +31,7 @@ class ProsodyEncoder(torch.nn.Module):
         self.n_temporal_layer = n_temporal_layer #model_config["melencoder"]["temporal_layer"]
         self.n_slf_attn_layer = n_slf_attn_layer #model_config["melencoder"]["slf_attn_layer"]
         self.n_slf_attn_head = n_slf_attn_head #model_config["melencoder"]["slf_attn_head"]
+        self.do_pool = pool
         d_k = d_v = (
             128 #model_config["melencoder"]["encoder_hidden"]
             // self.n_slf_attn_head #model_config["melencoder"]["slf_attn_head"]
@@ -79,7 +80,8 @@ class ProsodyEncoder(torch.nn.Module):
         if self.add_extra_linear:
             self.fc_3 = FCBlock(self.d_melencoder, self.d_melencoder)
 
-        self.avg_pool = nn.AvgPool1d(8, stride=4)
+        if self.do_pool:
+            self.avg_pool = nn.AvgPool1d(8, stride=4)
 
     def forward(self, mel, mask):
 
@@ -118,7 +120,8 @@ class ProsodyEncoder(torch.nn.Module):
 
         # Temporal Average Pooling
         # enc_output = torch.mean(enc_output, dim=1, keepdim=True) # [B, 1, H]
-        enc_output = self.avg_pool(enc_output.transpose(1, 2)).transpose(1, 2)
+        if self.do_pool:
+            enc_output = self.avg_pool(enc_output.transpose(1, 2)).transpose(1, 2) # [B, T/4, H]
 
         return enc_output, residual
 

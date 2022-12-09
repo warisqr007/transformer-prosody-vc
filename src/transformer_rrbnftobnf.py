@@ -168,7 +168,7 @@ class Transformer(TTSInterface, torch.nn.Module):
         #     torch.nn.InstanceNorm1d(args.adim, affine=False),
         # )
 
-        self.prosody_encoder = ProsodyEncoder(80, 32)
+        self.prosody_encoder = ProsodyEncoder(80, 512)
         
         # self.prosody_bottleneck = torch.nn.Sequential(
         #     torch.nn.Conv1d(256, 32, kernel_size=1, bias=False),
@@ -193,10 +193,10 @@ class Transformer(TTSInterface, torch.nn.Module):
         #     torch.nn.InstanceNorm1d(args.adim, affine=False),
         # )
 
-        #self.prosody_attention = MultiHeadedAttention(4, args.adim, 0.2)
+        self.prosody_attention = MultiHeadedAttention(4, args.adim, 0.2)
 
         self.prosody_projection = torch.nn.Linear(
-            args.adim + 32, args.adim
+            args.adim + args.adim, args.adim
         )
 
         # define transformer decoder
@@ -756,15 +756,15 @@ class Transformer(TTSInterface, torch.nn.Module):
         #prosody_vec = self.prosody_bottleneck(prosody_vec.transpose(1, 2)).transpose(1, 2)
 
         # print(f'hs: {hs.shape} \nHs Mask: {hs_masks.shape} \nProsody vec: {prosody_vec.shape} \nProsody Mask: {prosody_vec_mask.shape}')
-        #prosody_vec_att = self.prosody_attention(hs, prosody_vec, prosody_vec, None)
-        if hs.size(1) > prosody_vec.size(1):
-            prosody_vec = self.pad_sequences(prosody_vec, hs.size(1))
-        else:
-            hs = self.pad_sequences(hs, prosody_vec.size(1))
-            if hs_masks is not None:
-                hs_masks = self.pad_sequences(hs_masks.transpose(1,2), prosody_vec.size(1)).transpose(1, 2)
+        prosody_vec_att = self.prosody_attention(hs, prosody_vec, prosody_vec, None)
+        # if hs.size(1) > prosody_vec.size(1):
+        #     prosody_vec = self.pad_sequences(prosody_vec, hs.size(1))
+        # else:
+        #     hs = self.pad_sequences(hs, prosody_vec.size(1))
+        #     if hs_masks is not None:
+        #         hs_masks = self.pad_sequences(hs_masks.transpose(1,2), prosody_vec.size(1)).transpose(1, 2)
         # print(f'hs: {hs.shape} \nProsody vec: {prosody_vec.shape} \nProsody Mask: {prosody_vec_mask.shape}')
-        hs = self.prosody_projection(torch.cat([hs, prosody_vec], dim=-1))
+        hs = self.prosody_projection(torch.cat([hs, prosody_vec_att], dim=-1))
 
         return hs, hs_masks
 
