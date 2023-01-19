@@ -4,7 +4,7 @@ export LD_LIBRARY_PATH="${CUDA_HOME}/lib64:${LD_LIBRARY_PATH}"
 
 # path related
 eval "$(conda shell.bash hook)"
-conda activate transformer
+conda activate speechsplit
 
 # python related
 export OMP_NUM_THREADS=1

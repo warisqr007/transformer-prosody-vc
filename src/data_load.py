@@ -1,11 +1,13 @@
 import random
 import numpy as np
 import torch
+import pickle 
 import os
 from collections import OrderedDict
 from utils.f0_utils import get_cont_lf0, convert_continuous_f0
 import resampy
 from .audio_utils import MAX_WAV_VALUE, load_wav, mel_spectrogram, normalize
+from .speechsplit_utils import vtlp, get_spenv, get_spmel
 
 
 def read_fids(fid_list_f):
@@ -538,3 +540,249 @@ class OneshotArciticVcDataset(torch.utils.data.Dataset):
         prosody_vec = prosody_vec[:min_len]
         return f0, ppg, mel, prosody_vec
 
+
+class Utterances(torch.utils.data.Dataset):
+    """Dataset class for the Utterances dataset."""
+
+    def __init__(
+        self, 
+        meta_file: str,
+        feat_dir: str,
+        wav_dir: str,
+        f0_dir: str,
+        org_wav_dir: str,
+        spk_dvec_dir: str,
+        min_max_norm_mel: bool = False,
+        mel_min: float = None,
+        mel_max: float = None,
+        ):
+        """Initialize and preprocess the Utterances dataset."""
+        self.fid_list = read_fids(meta_file)
+
+        self.feat_dir = feat_dir
+        self.wav_dir = os.path.join(self.feat_dir, wav_dir)
+        self.spk_dvec_dir = spk_dvec_dir
+        self.f0_dir = os.path.join(self.feat_dir, f0_dir)
+        self.org_wav_dir = org_wav_dir
+        self.min_max_norm_mel = min_max_norm_mel
+
+        if min_max_norm_mel:
+            print("[INFO] Min-Max normalize Melspec.")
+            assert mel_min is not None
+            assert mel_max is not None
+            self.mel_max = mel_max
+            self.mel_min = mel_min
+
+        random.seed(1234)
+        random.shuffle(self.fid_list)
+        print(f'[INFO] Got {len(self.fid_list)} samples.')
+        
+    def __len__(self):
+        return len(self.fid_list)
+    
+    def compute_mel(self, wav_path):
+        audio, sr = load_wav(wav_path)
+        lwav = len(audio)
+        if sr != 24000:
+            audio = resampy.resample(audio, sr, 24000)
+        audio = audio / MAX_WAV_VALUE
+        audio = normalize(audio) * 0.95
+        audio = torch.FloatTensor(audio).unsqueeze(0)
+        melspec = mel_spectrogram(
+            audio,
+            n_fft=1024,
+            num_mels=80,
+            sampling_rate=24000,
+            hop_size=240,
+            win_size=1024,
+            fmin=0,
+            fmax=8000,
+        )
+        return melspec.squeeze(0).numpy().T, lwav
+
+    def bin_level_min_max_norm(self, melspec):
+        # frequency bin level min-max normalization to [-4, 4]
+        mel = (melspec - self.mel_min) / (self.mel_max - self.mel_min) * 8.0 - 4.0
+        return np.clip(mel, -4., 4.)
+
+    def get_spk_dvec(self, fid):
+        spk_dvec_path = f"{self.spk_dvec_dir}/{fid}.npy"
+        return torch.from_numpy(np.load(spk_dvec_path))
+
+    def __getitem__(self, index):
+        fid = self.fid_list[index]
+
+        wav_mono = np.load(os.path.join(self.wav_dir, f'{fid}.npy'))
+        sprf , wfle = fid.split('/')
+        spmel_path = os.path.join(self.org_wav_dir, sprf, "wav", wfle.split(".")[0]+".wav")
+        f0 = np.load(os.path.join(self.f0_dir, f'{fid}.npy'))
+
+        spk_id_org = None
+        emb_org = self.get_spk_dvec(fid)
+
+        spmel, _ = self.compute_mel(spmel_path)
+        if self.min_max_norm_mel:
+            spmel = self.bin_level_min_max_norm(spmel)
+        
+        spmel = torch.from_numpy(spmel)
+
+        alpha = np.random.uniform(low=0.9, high=1.1)
+        wav_mono = vtlp(wav_mono, 16000, alpha)
+        
+        spenv = get_spenv(wav_mono)
+        spmel_mono = get_spmel(wav_mono)
+        rhythm_input = torch.from_numpy(spenv)
+        content_input = torch.from_numpy(spmel_mono)
+        pitch_input = torch.from_numpy(f0)
+        timbre_input = emb_org
+        
+        return wav_mono, spk_id_org, spmel, rhythm_input, content_input, pitch_input, timbre_input
+
+
+class SpeechSplitCollate():
+    """Zero-pads model inputs and targets based on number of frames per step
+    """
+    def __init__(self, n_frames_per_step=1, give_uttids=False,
+                 f02ppg_length_ratio=1, use_spk_dvec=False):
+        self.n_frames_per_step = n_frames_per_step
+        self.give_uttids = give_uttids
+        self.f02ppg_length_ratio = f02ppg_length_ratio
+        self.use_spk_dvec = use_spk_dvec
+
+    def __call__(self, batch):
+        batch_size = len(batch)              
+        # Prepare different features 
+        # Input = (wav_mono, spk_id_org, spmel, rhythm_input, content_input, pitch_input, timbre_input)
+        # Output = (spk_id_org, spmel_gt, rhythm_input, content_input, pitch_input, timbre_input, len_crop)
+        
+        content_input = [x[4] for x in batch]
+        pitch_input = [x[5] for x in batch]
+        timbre_input = [x[6] for x in batch]
+        rhythm_input = [x[3] for x in batch]
+
+        mels = [x[2] for x in batch]
+
+        timbre_input = torch.stack(timbre_input).float()
+
+        ppg_lengths = [int(1.2*x.shape[0]) for x in content_input]
+        mel_lengths = [x.shape[0] for x in mels]
+
+        max_ppg_len = max(ppg_lengths)
+        max_mel_len = max(mel_lengths)
+
+        if max_mel_len % self.n_frames_per_step != 0:
+            max_mel_len += (self.n_frames_per_step - max_mel_len % self.n_frames_per_step)
+
+        content_dim = content_input[0].shape[1]
+        #print(f'pitch len : {len(pitch_input)} shape: {pitch_input[0].shape}')
+        #pitch_dim = pitch_input[0].shape[1]
+        rhythm_dim = rhythm_input[0].shape[1]
+        mel_dim = mels[0].shape[1]
+
+        content_padded = torch.FloatTensor(batch_size, max_ppg_len, content_dim).zero_()
+        pitch_padded = torch.FloatTensor(batch_size, max_ppg_len).zero_()
+        rhythm_padded = torch.FloatTensor(batch_size, max_ppg_len, rhythm_dim).zero_()
+        mels_padded = torch.FloatTensor(batch_size, max_mel_len, mel_dim).zero_()
+        stop_tokens = torch.FloatTensor(batch_size, max_mel_len).zero_()
+
+        for i in range(batch_size):
+            curr_content_len = content_input[i].shape[0]
+            curr_pitch_len = pitch_input[i].shape[0]
+            curr_rhythm_len = rhythm_input[i].shape[0]
+            curr_mel_len = mels[i].shape[0]
+
+            content_padded[i, :curr_content_len, :] = content_input[i]
+            pitch_padded[i, :curr_pitch_len] = pitch_input[i]
+            rhythm_padded[i, :curr_rhythm_len, :] = rhythm_input[i]
+            mels_padded[i, :curr_mel_len, :] = mels[i]
+
+            stop_tokens[i, curr_content_len-self.n_frames_per_step:] = 1
+        
+        ret_tup = (content_padded, pitch_padded, rhythm_padded, mels_padded, \
+            torch.LongTensor(ppg_lengths), torch.LongTensor(mel_lengths), timbre_input, stop_tokens)
+        
+        return ret_tup
+    
+
+class Collator(object):
+    def __init__(self, config):
+        self.min_len_seq = config.min_len_seq
+        self.max_len_seq = config.max_len_seq
+        self.max_len_pad = config.max_len_pad
+
+    def __call__(self, batch):
+        new_batch = []
+        for token in batch:
+
+            _, spk_id_org, spmel_gt, rhythm_input, content_input, pitch_input, timbre_input = token
+            len_crop = np.random.randint(self.min_len_seq, self.max_len_seq+1)
+            left = np.random.randint(0, len(spmel_gt)-len_crop)
+
+            spmel_gt = spmel_gt[left:left+len_crop, :] # [Lc, F]
+            rhythm_input = rhythm_input[left:left+len_crop, :] # [Lc, F]
+            content_input = content_input[left:left+len_crop, :] # [Lc, F]
+            pitch_input = pitch_input[left:left+len_crop] # [Lc, ]
+            
+            spmel_gt = np.clip(spmel_gt, 0, 1)
+            rhythm_input = np.clip(rhythm_input, 0, 1)
+            content_input = np.clip(content_input, 0, 1)
+            
+            spmel_gt = np.pad(spmel_gt, ((0,self.max_len_pad-spmel_gt.shape[0]),(0,0)), 'constant')
+            rhythm_input = np.pad(rhythm_input, ((0,self.max_len_pad-rhythm_input.shape[0]),(0,0)), 'constant')
+            content_input = np.pad(content_input, ((0,self.max_len_pad-content_input.shape[0]),(0,0)), 'constant')
+            pitch_input = np.pad(pitch_input[:,np.newaxis], ((0,self.max_len_pad-pitch_input.shape[0]),(0,0)), 'constant', constant_values=-1e10)
+            
+            new_batch.append( (spk_id_org, spmel_gt, rhythm_input, content_input, pitch_input, timbre_input, len_crop) ) 
+            
+        batch = new_batch  
+        spk_id_org, spmel_gt, rhythm_input, content_input, pitch_input, timbre_input, len_crop = zip(*batch)
+        spk_id_org = list(spk_id_org)
+        spmel_gt = torch.FloatTensor(np.stack(spmel_gt, axis=0))
+        rhythm_input = torch.FloatTensor(np.stack(rhythm_input, axis=0))
+        content_input = torch.FloatTensor(np.stack(content_input, axis=0))
+        pitch_input = torch.FloatTensor(np.stack(pitch_input, axis=0))
+        timbre_input = torch.FloatTensor(np.stack(timbre_input, axis=0))
+        len_crop = torch.LongTensor(np.stack(len_crop, axis=0))
+        
+        return spk_id_org, spmel_gt, rhythm_input, content_input, pitch_input, timbre_input, len_crop
+
+    
+class MultiSampler(torch.utils.data.sampler.Sampler):
+    """Samples elements more than once in a single pass through the data.
+    """
+    def __init__(self, num_samples, n_repeats, shuffle=False):
+        self.num_samples = num_samples
+        self.n_repeats = n_repeats
+        self.shuffle = shuffle
+
+    def gen_sample_array(self):
+        self.sample_idx_array = torch.arange(self.num_samples, dtype=torch.int64).repeat(self.n_repeats)
+        if self.shuffle:
+            self.sample_idx_array = self.sample_idx_array[torch.randperm(len(self.sample_idx_array))]
+        return self.sample_idx_array
+
+    def __iter__(self):
+        return iter(self.gen_sample_array())
+
+    def __len__(self):
+        return len(self.sample_idx_array)        
+
+
+def get_loader(config):
+    """Build and return a data loader list."""
+
+    dataset = Utterances(config)
+    collator = Collator(config)
+    sampler = MultiSampler(len(dataset), config.samplier, shuffle=config.shuffle)
+    worker_init_fn = lambda x: np.random.seed((torch.initial_seed()) % (2**32))
+    
+    data_loader = torch.utils.data.DataLoader(dataset=dataset,
+                                 batch_size=config.batch_size,
+                                 sampler=sampler,
+                                 num_workers=config.num_workers,
+                                 drop_last=False,
+                                 pin_memory=True,
+                                 worker_init_fn=worker_init_fn,
+                                 collate_fn=collator)
+
+    return data_loader

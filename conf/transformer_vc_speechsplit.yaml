@@ -4,6 +4,11 @@ data:
   eval_fid_list: "/home/shaunxliu/data/vctk/fidlists/eval_fidlist.txt"
   #arctic_ppg_dir: "/mnt/data1/waris/model_preprocessing/transformer-vc/bnfs"
   #arctic_ppg_dir: "/mnt/data1/waris/model_preprocessing/transformer-prosody-vc/bnfs"
+  feat_dir: "/mnt/data1/waris/repo/SpeechSplit2/feat"
+  wav_dir: "wav_mono"
+  f0_dir: "f0"
+  org_wav_dir: "/mnt/data1/waris/datasets/data/arctic_dataset/all_data_for_ac_vc_train"
+  spk_dvec_dir: "/mnt/data1/waris/model_preprocessing/transformer-vc/dvec/GE2E_spkEmbed_step_5805000"
   arctic_ppg_dir: "/mnt/data1/waris/datasets/data/arctic_dataset/all_data_for_ac_vc_train/SV2TTS/synthesizer/ppgs"
   arctic_f0_dir: "/mnt/data1/waris/model_preprocessing/transformer-vc/f0"
   arctic_wav_dir: "/mnt/data1/waris/datasets/data/arctic_dataset/all_data_for_ac_vc_train"
@@ -29,7 +34,7 @@ data:
 #   weight_decay: 1.0e-6
 #   lr_scheduler: 'warmup'   # "fixed", "warmup"
 hparas:
-  batch_size: 16
+  batch_size: 12
   valid_step: 10000
   max_step: 1000000
   optimizer: 'Lamb'
@@ -38,7 +43,7 @@ hparas:
   weight_decay: 0
   lr_scheduler:    # "fixed", "warmup"
 
-model_name: "transformer-vc"
+model_name: "transformer-speechsplit"
 model:
   input_size: 256    # 256 ppg_dim and 2 pitch 
   multi_spk: True
@@ -61,10 +66,10 @@ model:
   eprenet_conv_chans: 0
   dprenet_layers: 2  # one more linear layer w/o non_linear will be added for 0_centor
   dprenet_units: 256
-  adim: 512
+  adim: 384
   aheads: 4
   elayers: 4
-  eunits: 2048
+  eunits: 1536
   dlayers: 4
   dunits: 1536
   postnet_layers: 5
