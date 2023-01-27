@@ -156,7 +156,7 @@ class Transformer(TTSInterface, torch.nn.Module):
         self.dim_enc_2=args.prenet.dim_enc_2
 
         # convolutions for content
-        convolutions = []
+        self.convolutions_content = []
         for i in range(3):
             conv_layer = torch.nn.Sequential(
                 ConvNorm(self.dim_con if i==0 else self.dim_enc,
@@ -165,11 +165,11 @@ class Transformer(TTSInterface, torch.nn.Module):
                          padding=2,
                          dilation=1, w_init_gain='relu'),
                 torch.nn.GroupNorm(self.dim_enc//self.chs_grp, self.dim_enc))
-            convolutions.append(conv_layer)
-        self.convolutions_content = torch.nn.ModuleList(convolutions)
+            self.convolutions_content.append(conv_layer)
+        self.convolutions_content = torch.nn.ModuleList(self.convolutions_content)
                 
         # convolutions for f0
-        convolutions = []
+        self.convolutions_f0 = []
         for i in range(3):
             conv_layer = torch.nn.Sequential(
                 ConvNorm(self.dim_pit if i==0 else self.dim_enc_3,
@@ -178,11 +178,11 @@ class Transformer(TTSInterface, torch.nn.Module):
                          padding=2,
                          dilation=1, w_init_gain='relu'),
                 torch.nn.GroupNorm(self.dim_enc_3//self.chs_grp, self.dim_enc_3))
-            convolutions.append(conv_layer)
-        self.convolutions_f0 = torch.nn.ModuleList(convolutions)
+            self.convolutions_f0.append(conv_layer)
+        self.convolutions_f0 = torch.nn.ModuleList(self.convolutions_f0)
 
          # convolutions for rhythm
-        convolutions = []
+        self.convolutions_rhythm = []
         for i in range(1):
             conv_layer = torch.nn.Sequential(
                 ConvNorm(self.dim_rhy if i==0 else self.dim_enc_2,
@@ -191,11 +191,11 @@ class Transformer(TTSInterface, torch.nn.Module):
                          padding=2,
                          dilation=1, w_init_gain='relu'),
                 torch.nn.GroupNorm(self.dim_enc_2//self.chs_grp, self.dim_enc_2))
-            convolutions.append(conv_layer)
-        self.convolutions_rhythm = torch.nn.ModuleList(convolutions)
+            self.convolutions_rhythm.append(conv_layer)
+        self.convolutions_rhythm = torch.nn.ModuleList(self.convolutions_rhythm)
 
         self.encoder_projection = torch.nn.Linear(
-            self.dim_enc + self.dim_enc_2 + self.dim_enc_3, args.idim
+            args.adim + self.dim_enc_2 + self.dim_enc_3, args.adim
         )
         
         self.encoder = Encoder(
@@ -403,17 +403,26 @@ class Transformer(TTSInterface, torch.nn.Module):
         x_2 = x_2.transpose(1, 2)
 
         # print(f'x : {x.shape} \n x_2 : {x_2.shape} \n f0 : {f0.shape}')
-        xs_ds = torch.cat((x, x_2, f0), dim=-1)
-        xs_ds = self.encoder_projection(xs_ds)
+        #xs_ds = torch.cat((x, x_2, f0), dim=-1)
+        #xs_ds = self.encoder_projection(xs_ds)
 
         # print(x_masks[0])
         # print(x_masks.shape)
         # print(f'xs_ds : {xs_ds.shape} \n ilens_ds : {ilens_ds.shape} \n x_masks : {x_masks.shape}')
-        hs, hs_masks = self.encoder(xs_ds, x_masks)
+        hs, hs_masks = self.encoder(x, x_masks)
 
-        # print(f'hs : {hs.shape} \n hs_masks : {hs_masks.shape}')
+        hs = hs.repeat_interleave(4, dim=1)
+        hs_pad = hs.data.new(*(hs.shape[0], x_2.shape[1], hs.shape[2])).fill_(0)
+        hs_pad[:,:hs.shape[1],:] = hs
+
+        hs_masks = hs_masks.repeat_interleave(4, dim=-1)
+        hs_masks_pad = hs.data.new(*(hs_masks.shape[0], hs_masks.shape[1], x_2.shape[1])).fill_(0)
+        hs_masks_pad[:,:,:hs_masks.shape[2]] = hs_masks
+        # print(f'hs : {hs_pad.shape} \n hs_masks : {hs_masks_pad.shape}')
         # print(hs_masks[0])
         # print(f'hs_mask shape: {hs_masks.shape}')
+        hs = torch.cat((hs_pad, x_2, f0), dim=-1)
+        hs = self.encoder_projection(hs)
 
         # integrate speaker embedding
         if self.spk_embed_dim is not None and self.whereusespkd != 'atinput' and self.whereusespkd != 'withprosody':
@@ -442,7 +451,7 @@ class Transformer(TTSInterface, torch.nn.Module):
 
         # forward decoder
         y_masks = self._target_mask(olens_in)
-        zs, _ = self.decoder(ys_in, y_masks, hs_int, hs_masks)
+        zs, _ = self.decoder(ys_in, y_masks, hs_int, hs_masks_pad)
         # (B, Lmax//r, odim * r) -> (B, Lmax//r * r, odim)
         before_outs = self.feat_out(zs).view(zs.size(0), -1, self.odim)
         # (B, Lmax//r, r) -> (B, Lmax//r * r)
@@ -475,9 +484,9 @@ class Transformer(TTSInterface, torch.nn.Module):
             after_outs, before_outs, ys, olens
         )
         
-        loss = l1_loss + l2_loss
+        #loss = l1_loss + l2_loss
 
-        #loss = l2_loss
+        loss = l2_loss
         # if self.loss_type == "L1":
         #     loss = l1_loss 
         # elif self.loss_type == "L2":

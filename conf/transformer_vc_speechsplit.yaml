@@ -72,7 +72,7 @@ model:
   eunits: 1536
   dlayers: 4
   dunits: 1536
-  postnet_layers: 5
+  postnet_layers: 3
   postnet_filts: 5
   postnet_chans: 256
   use_masking: True
